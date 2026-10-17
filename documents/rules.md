@@ -74,6 +74,7 @@
 | **DOC-07** | Create Implementation Checklist (`todo.md`) | Planning | `[COMPLETED]` | 2026-10-17 08:19 | `documents/todo.md` created & reviewed |
 | **DOC-08** | Create Operational Protocol & Rules (`rules.md`) | Planning | `[COMPLETED]` | 2026-10-17 08:20 | `documents/rules.md` created & initialized |
 | **DOC-09** | Create Master Project README (`README.md`) in root | Planning | `[COMPLETED]` | 2026-10-17 08:28 | `README.md` created & synced to WSL root |
+| **GIT-01** | Git init, initial commit & push to GitHub `origin/main` | Setup | `[COMPLETED]` | 2026-10-17 08:31 | Pushed to `Ashrit-Raghupatruni/gem5-ml-perf-prediction` |
 | **PH1-01** | Implement ARM64 Benchmark Suite (4 benchmarks) | Phase 1 | `[ ]` | Pending | `benchmarks/*.c` |
 | **PH1-02** | Compile Benchmarks with aarch64 gcc | Phase 1 | `[ ]` | Pending | Static ELF verification |
 | **PH2-01** | Develop Parametric ARM O3 CPU Config Script | Phase 2 | `[ ]` | Pending | `configs/arm_o3_parametric.py` |
