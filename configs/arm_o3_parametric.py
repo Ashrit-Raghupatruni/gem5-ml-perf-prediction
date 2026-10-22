@@ -23,7 +23,7 @@ from gem5.resources.resource import BinaryResource
 from gem5.simulate.simulator import Simulator
 from m5.objects import (
     BadAddr, BaseCPU, BaseXBar, Cache, L2XBar, SystemXBar, Port,
-    TournamentBP, BiModeBP, LocalBP
+    BranchPredictor, TournamentBP, BiModeBP, LocalBP
 )
 
 # Enforce ARM ISA
@@ -147,7 +147,8 @@ for core in processor.get_cores():
     
     # Configure Execution Buffers
     sim_core.numROBEntries = args.rob
-    sim_core.numIQEntries = args.iq
+    if hasattr(sim_core, "instQueues") and len(sim_core.instQueues) > 0:
+        sim_core.instQueues[0].numEntries = args.iq
     sim_core.LQEntries = args.lq
     sim_core.SQEntries = args.sq
     sim_core.numPhysIntRegs = args.phys_regs
@@ -155,11 +156,17 @@ for core in processor.get_cores():
     
     # Configure Branch Predictor
     if args.branch_pred == "TournamentBP":
-        sim_core.branchPred = TournamentBP()
+        class CustomBP(BranchPredictor):
+            conditionalBranchPred = TournamentBP()
+        sim_core.branchPred = CustomBP()
     elif args.branch_pred == "BiModeBP":
-        sim_core.branchPred = BiModeBP()
+        class CustomBP(BranchPredictor):
+            conditionalBranchPred = BiModeBP()
+        sim_core.branchPred = CustomBP()
     elif args.branch_pred == "LocalBP":
-        sim_core.branchPred = LocalBP()
+        class CustomBP(BranchPredictor):
+            conditionalBranchPred = LocalBP()
+        sim_core.branchPred = CustomBP()
 
 # 4. Create simple board
 board = SimpleBoard(
