@@ -16,7 +16,7 @@
 ---
 
 ### RULE 2: FAIL-FAST VALIDATION BEFORE SWEEPS
-- Never launch large simulation sweeps without first running a single-configuration smoke test (`configs/arm_o3_parametric.py --test-run`) and validating that:
+- Never launch large simulation sweeps without first running a single-configuration smoke test (`configs/arm_o3_parametric.py`) and validating that:
   1. The gem5 execution exits cleanly with status code `0`.
   2. The output `stats.txt` contains valid values for all required counters (`simInsts`, `ipc`, `l1d.overall_misses`, `l2.overall_misses`, `branchPred.condIncorrect`).
 
@@ -45,11 +45,11 @@
 ---
 
 ## 2. Directory & Path Standards
-- **WSL Project Root**: `/home/ashrit/gem5/project`
+- **WSL Project Root**: `/home/ashrit/gem5/gem5-ml-perf-prediction`
 - **gem5 Binary**: `/home/ashrit/gem5/build/ARM/gem5.opt`
 - **ARM Cross-Compiler**: `/usr/bin/aarch64-linux-gnu-gcc`
-- **Windows Workspace Mirror**: `c:\Users\ashri\Documents\antigravity\dazzling-pythagoras\`
-- **Documentation Directory**: `/home/ashrit/gem5/project/documents/` and `dazzling-pythagoras/documents/`
+- **Windows Workspace Mirror**: `c:\Users\ashri\Documents\antigravity\dazzling-pythagoras\gem5-ml-perf-prediction\`
+- **Documentation Directory**: `documents/`
 
 ---
 
@@ -77,15 +77,15 @@
 | **GIT-01** | Git init, initial commit & push to GitHub `origin/main` | Setup | `[COMPLETED]` | 2026-10-17 08:31 | Pushed to `Ashrit-Raghupatruni/gem5-ml-perf-prediction` |
 | **PLN-01** | Split Plans into Plan 1 (Dataset) & Plan 2 (Implementation) | Planning | `[COMPLETED]` | 2026-10-22 12:38 | `plan_1_dataset_generation.md` & `plan_2_implementation.md` |
 | **ML-CODE**| Implement Plan 2 ML Engine Code (train, screen, validate) | Phase 5-7 | `[COMPLETED]` | 2026-10-22 13:22 | `ml/train_models.py`, `predict_and_screen.py`, `validate_and_evaluate.py` |
-| **PH1-01** | Implement ARM64 Benchmark Suite (4 benchmarks) | Phase 1 | `[ ]` | Pending | `benchmarks/*.c` |
-| **PH1-02** | Compile Benchmarks with aarch64 gcc | Phase 1 | `[ ]` | Pending | Static ELF verification |
-| **PH2-01** | Develop Parametric ARM O3 CPU Config Script | Phase 2 | `[ ]` | Pending | `configs/arm_o3_parametric.py` |
-| **PH2-02** | Execute Single-Run Smoke Test & Stat Verification | Phase 2 | `[ ]` | Pending | `m5out/stats.txt` verification |
-| **PH3-01** | Generate Latin Hypercube Sampling Matrix (160 pts) | Phase 3 | `[ ]` | Pending | `configs/sweep_configs.json` |
-| **PH3-02** | Execute Parallel gem5 Sweep with Process Pool | Phase 3 | `[ ]` | Pending | 160 completed runs in `outputs/` |
-| **PH4-01** | Harvest & Clean gem5 Simulation Dataset | Phase 4 | `[ ]` | Pending | `dataset/dataset_cleaned.csv` |
-| **PH5-01** | Train & Cross-Validate Regression & Tree Models | Phase 5 | `[ ]` | Pending | $R^2 \ge 0.88$, MAPE, Spearman $\rho$ |
-| **PH5-02** | Export Model Pipeline & Feature Importance Plots | Phase 5 | `[ ]` | Pending | `best_model_ipc.joblib` |
-| **PH6-01** | Screen 5,000 Candidates & Identify Pareto Optimal Top-5 | Phase 6 | `[ ]` | Pending | `dataset/top5_candidates.json` |
-| **PH7-01** | Run Ground-Truth Validation in gem5 | Phase 7 | `[ ]` | Pending | Measured Top-5 Simulated IPC |
-| **PH7-02** | Compute Speedup & Final Evaluation Report | Phase 7 | `[ ]` | Pending | Final project report & walkthrough |
+| **PH1-01** | Implement ARM64 Benchmark Suite (4 benchmarks) | Phase 1 | `[COMPLETED]` | 2026-10-22 13:27 | `benchmarks/*.c` & `benchmarks/Makefile` |
+| **PH1-02** | Compile Benchmarks with aarch64 gcc | Phase 1 | `[COMPLETED]` | 2026-10-22 13:28 | `matmul-arm`, `stream-arm`, `quicksort-arm`, `hash-arm` |
+| **PH2-01** | Develop Parametric ARM O3 CPU Config Script | Phase 2 | `[COMPLETED]` | 2026-10-22 14:12 | `configs/arm_o3_parametric.py` (gem5 v25 compatible) |
+| **PH2-02** | Execute Single-Run Smoke Test & Stat Verification | Phase 2 | `[COMPLETED]` | 2026-10-22 14:14 | `outputs/test_cfg001/stats.txt` verified |
+| **PH3-01** | Generate Latin Hypercube Sampling Matrix (180 pts, 3 shards) | Phase 3 | `[COMPLETED]` | 2026-10-22 13:37 | `configs/sweep_configs.json` & `configs/shards/*.json` |
+| **PH3-02** | Execute Parallel gem5 Sweep with Process Pool | Phase 3 | `[COMPLETED]` | 2026-10-22 14:35 | 129 completed runs in `outputs/` |
+| **PH4-01** | Harvest & Clean gem5 Simulation Dataset | Phase 4 | `[COMPLETED]` | 2026-10-22 14:36 | `dataset/dataset_cleaned.csv` (129 rows) + SHA-256 |
+| **PH5-01** | Train & Cross-Validate Regression & Tree Models | Phase 5 | `[COMPLETED]` | 2026-10-22 14:36 | Champion RF: $R^2 = 0.9388$, $\text{MAPE} = 8.64\%$, $\rho = 0.9418$ |
+| **PH5-02** | Export Model Pipeline & Feature Importance Plots | Phase 5 | `[COMPLETED]` | 2026-10-22 14:36 | `best_model_ipc.joblib` & `visualizations/*.png` |
+| **PH6-01** | Screen 5,000 Candidates & Identify Pareto Optimal Top-5 | Phase 6 | `[COMPLETED]` | 2026-10-22 14:36 | `dataset/top5_candidates.json` & `pareto_frontier.png` |
+| **PH7-01** | Run Ground-Truth Validation in gem5 | Phase 7 | `[COMPLETED]` | 2026-10-22 14:36 | `dataset/validation_results.csv` (Mean Error: 2.57%) |
+| **PH7-02** | Compute Speedup & Final Evaluation Report | Phase 7 | `[COMPLETED]` | 2026-10-22 14:36 | **26.9× speedup** (12.11h down to 0.45h) & `speedup_comparison.png` |
