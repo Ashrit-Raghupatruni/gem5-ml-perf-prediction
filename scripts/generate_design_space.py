@@ -2,44 +2,40 @@
 """
 Latin Hypercube Sampling (LHS) Generator with Independent Parameter Decoupling
 Project: ML-Based Microarchitectural Performance Prediction (ARM gem5)
-Strictly adheres to: documents/schema.md, Plan 1 (3-Member / 3-Laptop Execution)
+Strictly adheres to: documents/schema.md
 """
 
 import os
+import sys
 import json
 import argparse
 import numpy as np
 from scipy.stats import qmc
 
 
-def generate_lhs_design_space(num_samples=180, seed=42, independent_widths=True):
+def generate_lhs_design_space(num_samples, seed=42, independent_widths=True):
     """
-    Samples microarchitectural space uniformly across 4 benchmarks.
-    When independent_widths=True, every independently varied parameter is assigned
-    its own unique dimension in the LHS matrix (d=17):
-      dim 0: fetch_width
-      dim 1: decode_width
-      dim 2: issue_width
-      dim 3: commit_width
-      dim 4: rob_entries
-      dim 5: iq_entries
-      dim 6: lq_entries
-      dim 7: sq_entries
-      dim 8: phys_int_regs
-      dim 9: l1d_size_kb
-      dim 10: l1d_assoc
-      dim 11: l1i_size_kb
-      dim 12: l1i_assoc
-      dim 13: l2_size_kb
-      dim 14: l2_assoc
-      dim 15: clk_freq_ghz
-      dim 16: branch_predictor
-    Ensures zero dimension-reuse or unintended inter-parameter correlations.
+    Samples microarchitectural space uniformly across 4 benchmark workloads.
+    
+    Args:
+        num_samples (int): Total number of design configurations to generate (must be a positive integer).
+        seed (int): Random seed for reproducible LHS matrix generation.
+        independent_widths (bool): If True, decouples fetch, decode, issue, and commit widths
+                                   with microarchitectural monotonic constraints (issue <= decode <= fetch,
+                                   commit >= issue) using d=17 orthogonal dimensions.
+                                   If False, couples all widths together for legacy comparison.
+
+    Returns:
+        list[dict]: List of generated configuration dictionaries matching the schema.
     """
+    if not isinstance(num_samples, int) or num_samples <= 0:
+        raise ValueError(f"num_samples must be a positive integer, got: {num_samples}")
+
     workloads = ['matmul', 'stream', 'quicksort', 'hash']
     base_samples = num_samples // len(workloads)
     remainder = num_samples % len(workloads)
     
+    # Fair remainder distribution: distribute remainder 1-by-1 across workloads
     wl_samples = {wl: base_samples + (1 if idx < remainder else 0) for idx, wl in enumerate(workloads)}
     
     widths_allowed = [2, 4, 8]
@@ -53,7 +49,7 @@ def generate_lhs_design_space(num_samples=180, seed=42, independent_widths=True)
     freqs = [1.5, 2.0, 2.4, 3.0]
     branch_preds = ['TournamentBP', 'BiModeBP', 'LocalBP']
     
-    # 17 orthogonal LHS dimensions for decoupled microarchitecture
+    # 17 orthogonal LHS dimensions for decoupled microarchitecture (no dimension reuse)
     dim = 17 if independent_widths else 10
     sampler = qmc.LatinHypercube(d=dim, seed=seed)
     
@@ -89,14 +85,14 @@ def generate_lhs_design_space(num_samples=180, seed=42, independent_widths=True)
                 iq_high = min(96, rob)
                 iq = int(iq_low + s[5] * (iq_high - iq_low))
                 
-                # LQ and SQ: 16 to min(64, int(ROB * 0.5))
+                # LQ and SQ: 16 to min(64, int(ROB * 0.4))
                 lq_high = min(64, max(16, int(rob * 0.4)))
                 lq = int(16 + s[6] * (lq_high - 16)) if lq_high > 16 else 16
                 
                 sq_high = min(64, max(16, int(rob * 0.4)))
                 sq = int(16 + s[7] * (sq_high - 16)) if sq_high > 16 else 16
                 
-                # Physical registers: max(128, int(ROB * 0.5)) to min(256, int(ROB * 1.2))
+                # Physical registers: max(128, int(ROB * 0.5)) to min(256, int(ROB * 1.1))
                 phys_low = max(128, int(rob * 0.5))
                 phys_high = min(256, max(phys_low + 10, int(rob * 1.1)))
                 phys_regs = int(phys_low + s[8] * (phys_high - phys_low))
@@ -160,10 +156,19 @@ def generate_lhs_design_space(num_samples=180, seed=42, independent_widths=True)
             })
             cfg_counter += 1
             
+    if len(all_configs) != num_samples:
+        raise RuntimeError(f"Requested {num_samples} configurations, but generated {len(all_configs)}.")
+        
     return all_configs
 
 
 def save_and_split_shards(configs, output_dir, num_shards=3):
+    """
+    Saves master configs JSON and splits configs across num_shards without dropping any configurations.
+    """
+    if num_shards <= 0:
+        raise ValueError(f"num_shards must be at least 1, got {num_shards}")
+        
     os.makedirs(output_dir, exist_ok=True)
     master_path = os.path.join(output_dir, "sweep_configs.json")
     with open(master_path, 'w') as f:
@@ -184,13 +189,28 @@ def save_and_split_shards(configs, output_dir, num_shards=3):
         print(f"[SUCCESS] Exported Shard {i+1} ({len(shard_configs)} points) to: {shard_path}")
 
 
+def positive_int(value):
+    try:
+        ivalue = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"'{value}' is not an integer. Must be a positive integer.")
+    if ivalue <= 0:
+        raise argparse.ArgumentTypeError(f"'{value}' is invalid. Number of samples must be > 0.")
+    return ivalue
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="LHS Design Space Generator & Sharder with Decoupled Parameters")
-    parser.add_argument("--samples", type=int, default=180, help="Total simulation sample points (default: 180)")
-    parser.add_argument("--shards", type=int, default=3, help="Number of team shards to split across laptops (default: 3)")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed for LHS sampling (default: 42)")
-    parser.add_argument("--coupled", action="store_true", help="Force coupled widths and proportional queues (legacy mode)")
-    parser.add_argument("--output-dir", type=str, default="configs", help="Directory to save config files")
+    parser.add_argument("--samples", type=positive_int, required=True,
+                        help="Total simulation sample points to generate (required positive integer, e.g. 180, 300, 500, 1000)")
+    parser.add_argument("--shards", type=positive_int, default=3,
+                        help="Number of team shards to split across laptops (default: 3)")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="Random seed for LHS sampling (default: 42)")
+    parser.add_argument("--coupled", action="store_true",
+                        help="Force coupled widths and proportional queues (legacy mode)")
+    parser.add_argument("--output-dir", type=str, default="configs",
+                        help="Directory to save config files (default: configs)")
     args = parser.parse_args()
     
     configs = generate_lhs_design_space(num_samples=args.samples, seed=args.seed, independent_widths=not args.coupled)

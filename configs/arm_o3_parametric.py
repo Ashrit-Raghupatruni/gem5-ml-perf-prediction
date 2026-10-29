@@ -155,6 +155,12 @@ for core in processor.get_cores():
     sim_core.wbWidth = commit_w
     sim_core.commitWidth = commit_w
     
+    # Ensure time buffers accommodate writeback skew when issueWidth/FUs > wbWidth
+    # With up to ~25 functional units, wbCycle can advance up to ceil(25 / wbWidth)
+    # Default forwardComSize (5) overflows for wbWidth=2 or narrow pipelines.
+    sim_core.forwardComSize = max(sim_core.forwardComSize.getValue(), int(32 / max(1, commit_w)) + 5)
+    sim_core.backComSize = max(sim_core.backComSize.getValue(), int(32 / max(1, commit_w)) + 5)
+    
     # Configure Execution Buffers
     sim_core.numROBEntries = args.rob
     if hasattr(sim_core, "instQueues") and len(sim_core.instQueues) > 0:

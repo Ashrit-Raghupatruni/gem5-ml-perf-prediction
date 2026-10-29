@@ -12,7 +12,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from scripts.generate_design_space import generate_lhs_design_space, save_and_split_shards
+from scripts.generate_design_space import generate_lhs_design_space, save_and_split_shards, positive_int
 from scripts.parse_dataset import parse_single_stats, audit_simulation_manifests
 from ml.predict_and_screen import generate_candidate_design_space, compute_cost_and_energy_proxies, find_pareto_frontier
 from ml.train_models import build_preprocessor, get_model_candidates, get_feature_definitions
@@ -21,47 +21,98 @@ from sklearn.pipeline import Pipeline
 
 
 class TestDesignSpaceGenerator(unittest.TestCase):
-    def test_sample_counts_and_shards(self):
-        configs = generate_lhs_design_space(num_samples=40, seed=42, independent_widths=True)
-        self.assertEqual(len(configs), 40)
-        
-        # Check workload balance
+    def test_arbitrary_sample_counts(self):
+        """
+        Tests user-selected sample counts (100, 180, 300, 501) and exact generation.
+        """
+        for sample_count in [100, 180, 300, 501]:
+            configs = generate_lhs_design_space(num_samples=sample_count, seed=42, independent_widths=True)
+            self.assertEqual(len(configs), sample_count, f"Failed exact generation for sample_count={sample_count}")
+            
+            # Verify no duplicate config_ids
+            cids = [c['config_id'] for c in configs]
+            self.assertEqual(len(cids), len(set(cids)), f"Duplicate config IDs detected for count={sample_count}")
+
+    def test_workload_distribution_remainder_handling(self):
+        """
+        Tests fair remainder distribution across workloads when sample count is not divisible by 4.
+        """
+        # 501 % 4 = 1 remainder -> matmul should get 126, others 125
+        configs = generate_lhs_design_space(num_samples=501, seed=42, independent_widths=True)
         wls = [c['workload'] for c in configs]
-        self.assertEqual(wls.count('matmul'), 10)
-        self.assertEqual(wls.count('stream'), 10)
-        self.assertEqual(wls.count('quicksort'), 10)
-        self.assertEqual(wls.count('hash'), 10)
-        
-        # Verify microarchitectural monotonic constraint legality
+        self.assertEqual(wls.count('matmul'), 126)
+        self.assertEqual(wls.count('stream'), 125)
+        self.assertEqual(wls.count('quicksort'), 125)
+        self.assertEqual(wls.count('hash'), 125)
+        self.assertEqual(sum([wls.count(wl) for wl in ['matmul', 'stream', 'quicksort', 'hash']]), 501)
+
+        # 102 % 4 = 2 remainder -> matmul 26, stream 26, quicksort 25, hash 25
+        configs_102 = generate_lhs_design_space(num_samples=102, seed=42, independent_widths=True)
+        wls_102 = [c['workload'] for c in configs_102]
+        self.assertEqual(wls_102.count('matmul'), 26)
+        self.assertEqual(wls_102.count('stream'), 26)
+        self.assertEqual(wls_102.count('quicksort'), 25)
+        self.assertEqual(wls_102.count('hash'), 25)
+
+    def test_shard_partitioning_and_boundaries(self):
+        """
+        Tests that shard sizes add up exactly to the total with no overlap or missing configs.
+        """
+        for total in [100, 300, 501]:
+            configs = generate_lhs_design_space(num_samples=total, seed=42, independent_widths=True)
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                save_and_split_shards(configs, tmp_dir, num_shards=3)
+                
+                s1_file = os.path.join(tmp_dir, "shards", "shard_1.json")
+                s2_file = os.path.join(tmp_dir, "shards", "shard_2.json")
+                s3_file = os.path.join(tmp_dir, "shards", "shard_3.json")
+                
+                with open(s1_file) as f: s1 = json.load(f)
+                with open(s2_file) as f: s2 = json.load(f)
+                with open(s3_file) as f: s3 = json.load(f)
+                
+                self.assertEqual(len(s1) + len(s2) + len(s3), total)
+                
+                # Check boundary disjointness
+                s1_ids = {c['config_id'] for c in s1}
+                s2_ids = {c['config_id'] for c in s2}
+                s3_ids = {c['config_id'] for c in s3}
+                self.assertTrue(s1_ids.isdisjoint(s2_ids))
+                self.assertTrue(s2_ids.isdisjoint(s3_ids))
+                self.assertTrue(s1_ids.isdisjoint(s3_ids))
+
+    def test_invalid_sample_count_inputs(self):
+        """
+        Tests rejection and clear error raising for negative, zero, or non-integer inputs.
+        """
+        with self.assertRaises(ValueError):
+            generate_lhs_design_space(num_samples=0)
+        with self.assertRaises(ValueError):
+            generate_lhs_design_space(num_samples=-50)
+        with self.assertRaises(ValueError):
+            generate_lhs_design_space(num_samples=100.5)
+        with self.assertRaises(ValueError):
+            generate_lhs_design_space(num_samples="three_hundred")
+            
+        with self.assertRaises(Exception):
+            positive_int("0")
+        with self.assertRaises(Exception):
+            positive_int("-10")
+        with self.assertRaises(Exception):
+            positive_int("abc")
+
+    def test_monotonic_hardware_constraints(self):
+        configs = generate_lhs_design_space(num_samples=100, seed=42, independent_widths=True)
         for c in configs:
             self.assertGreaterEqual(c['fetch_width'], c['decode_width'])
             self.assertGreaterEqual(c['decode_width'], c['issue_width'])
             self.assertGreaterEqual(c['commit_width'], c['issue_width'])
             self.assertGreaterEqual(c['rob_entries'], c['iq_entries'])
-        
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            save_and_split_shards(configs, tmp_dir, num_shards=3)
-            master_file = os.path.join(tmp_dir, "sweep_configs.json")
-            self.assertTrue(os.path.exists(master_file))
-            
-            with open(os.path.join(tmp_dir, "shards", "shard_1.json")) as f1:
-                s1 = json.load(f1)
-            with open(os.path.join(tmp_dir, "shards", "shard_2.json")) as f2:
-                s2 = json.load(f2)
-            with open(os.path.join(tmp_dir, "shards", "shard_3.json")) as f3:
-                s3 = json.load(f3)
-            self.assertEqual(len(s1) + len(s2) + len(s3), 40)
 
     def test_orthogonal_dimensions_no_correlations(self):
-        """
-        Tests that independently sampled parameters exhibit no unintended deterministic correlation.
-        """
-        configs = generate_lhs_design_space(num_samples=180, seed=42, independent_widths=True)
+        configs = generate_lhs_design_space(num_samples=250, seed=42, independent_widths=True)
         df_cfg = pd.DataFrame(configs)
-        
-        # Check that L2 assoc and frequency are not correlated with widths
         corr_matrix = df_cfg[['l2_assoc', 'clk_freq_ghz', 'l1d_size_kb', 'l2_size_kb']].corr().abs()
-        # Non-diagonal correlations in orthogonal LHS should be well below 0.35
         for i in range(len(corr_matrix)):
             for j in range(i + 1, len(corr_matrix)):
                 val = corr_matrix.iloc[i, j]

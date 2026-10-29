@@ -1,0 +1,87 @@
+{
+  "mean_validation_error_pct": 3.291070003751794,
+  "optimizer_metrics": {
+    "status": "EVALUATED",
+    "best_known_dataset_ipc": 3.105611,
+    "best_validated_candidate_ipc": 2.848025,
+    "simple_regret": 0.2575860000000003,
+    "percentile_used": 0.9,
+    "percentile_threshold_ipc": 1.4189175000000003,
+    "top_k_hit_rate_pct": 60.0
+  },
+  "timing_accounting": {
+    "is_timing_measured_from_manifests": true,
+    "per_sim_cpu_seconds": 12.9872377814189,
+    "empirical_parallel_efficiency": 0.954483222970434,
+    "workers_count": 8,
+    "doe_cpu_hours": 0.15512534016694796,
+    "doe_wall_clock_hours": 0.020315357100277855,
+    "validation_cpu_hours": 0.009043992231666683,
+    "validation_wall_clock_hours": 0.009043992231666683,
+    "directly_measured_ml_wall_overhead_sec": 1.0790444609992846,
+    "directly_measured_ml_cpu_overhead_sec": 1.11497635,
+    "extrapolated_exhaustive_serial_core_hours": 18.037830251970693,
+    "extrapolated_exhaustive_parallel_wall_hours": 2.3622508256137036,
+    "measured_ml_guided_wall_hours": 0.029659083904444338,
+    "measured_ml_guided_cpu_hours": 0.16447904805139243,
+    "extrapolated_host_wall_clock_speedup": 79.64678994214404,
+    "extrapolated_core_hour_speedup": 109.6664314735982
+  },
+  "validation_details": [
+    {
+      "candidate_id": "TOP_01",
+      "workload": "quicksort",
+      "predicted_ipc": 0.9491500980000018,
+      "simulated_ipc": 0.95463,
+      "absolute_error": 0.005479901999998149,
+      "percentage_error": 0.5740341284055759,
+      "sim_wallclock_sec": 12.678340929000115,
+      "sim_cpu_sec": 12.678340929000115,
+      "hardware_cost_proxy": 14.400000000000002
+    },
+    {
+      "candidate_id": "TOP_02",
+      "workload": "matmul",
+      "predicted_ipc": 1.4241029799999985,
+      "simulated_ipc": 1.408993,
+      "absolute_error": 0.015109979999998524,
+      "percentage_error": 1.0723956754929602,
+      "sim_wallclock_sec": 5.545867548000388,
+      "sim_cpu_sec": 5.545867548000388,
+      "hardware_cost_proxy": 17.4
+    },
+    {
+      "candidate_id": "TOP_03",
+      "workload": "matmul",
+      "predicted_ipc": 2.5171043800000006,
+      "simulated_ipc": 2.492012,
+      "absolute_error": 0.02509238000000069,
+      "percentage_error": 1.00691248677778,
+      "sim_wallclock_sec": 4.579003079999893,
+      "sim_cpu_sec": 4.579003079999893,
+      "hardware_cost_proxy": 20.4
+    },
+    {
+      "candidate_id": "TOP_04",
+      "workload": "matmul",
+      "predicted_ipc": 2.9053126950000023,
+      "simulated_ipc": 2.683321,
+      "absolute_error": 0.2219916950000025,
+      "percentage_error": 8.273020447423269,
+      "sim_wallclock_sec": 5.206883326000025,
+      "sim_cpu_sec": 5.206883326000025,
+      "hardware_cost_proxy": 27.599999999999998
+    },
+    {
+      "candidate_id": "TOP_05",
+      "workload": "matmul",
+      "predicted_ipc": 3.0054919399999993,
+      "simulated_ipc": 2.848025,
+      "absolute_error": 0.1574669399999995,
+      "percentage_error": 5.528987280659387,
+      "sim_wallclock_sec": 4.548277150999638,
+      "sim_cpu_sec": 4.548277150999638,
+      "hardware_cost_proxy": 35.6
+    }
+  ]
+}

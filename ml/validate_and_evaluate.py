@@ -195,7 +195,10 @@ def measure_ml_pipeline_overhead(model_path="ml/saved_models/best_model_ipc.jobl
     Directly measures the actual CPU time and wall-clock overhead of the candidate screening pipeline
     instead of using an assumed constant.
     """
-    from ml.predict_and_screen import generate_candidate_design_space, predict_with_uncertainty, find_pareto_frontier, compute_cost_and_energy_proxies
+    try:
+        from ml.predict_and_screen import generate_candidate_design_space, predict_with_uncertainty, find_pareto_frontier, compute_cost_and_energy_proxies
+    except ModuleNotFoundError:
+        from predict_and_screen import generate_candidate_design_space, predict_with_uncertainty, find_pareto_frontier, compute_cost_and_energy_proxies
     import joblib
     
     if not os.path.exists(model_path):
@@ -343,7 +346,8 @@ def validate_candidates(candidates_json, gem5_bin, script_path, benchmarks_dir, 
         parallel_eff = manifest_data['empirical_parallel_eff']
         is_timing_measured = True
     else:
-        doe_samples = 180
+        # If manifests are absent, estimate DoE size from reference dataset or candidate count
+        doe_samples = len(pd.read_csv(dataset_cleaned_path)) if os.path.exists(dataset_cleaned_path) else len(candidates)
         per_sim_cpu_sec = val_avg_cpu_time
         doe_cpu_sec = doe_samples * per_sim_cpu_sec
         avg_workers = 4

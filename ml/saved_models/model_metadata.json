@@ -1,0 +1,128 @@
+{
+  "target_metric": "ipc",
+  "model_architecture": "RandomForest",
+  "training_samples": 240,
+  "test_samples": 60,
+  "train_cv_5fold": {
+    "mean_r2": 0.9690615876482708,
+    "mean_mape": 3.8090520542110737,
+    "mean_rmse": 0.07695190186633145,
+    "mean_spearman": 0.9440512375162833
+  },
+  "held_out_test_metrics": {
+    "r2": 0.9300012648752117,
+    "mape": 4.587583916286561,
+    "rmse": 0.11727676898720897,
+    "mae": 0.04844732677361132,
+    "spearman": 0.9018060572381219,
+    "confidence_intervals_95": {
+      "r2_ci95": [
+        0.7944832337582232,
+        0.9885112794095168
+      ],
+      "mape_ci95": [
+        2.1980898798779203,
+        7.844863315147412
+      ],
+      "rmse_ci95": [
+        0.04640510728550688,
+        0.17360959464847564
+      ],
+      "mae_ci95": [
+        0.024403548437639085,
+        0.07940833690854197
+      ],
+      "spearman_ci95": [
+        0.7681532967713594,
+        0.9767771503888998
+      ]
+    }
+  },
+  "grouped_cross_workload_cv": {
+    "mean_r2": -1302.6042957987756,
+    "mean_mae": 0.42536109204460315,
+    "mean_mape": 39.59053151947125,
+    "mean_rmse": 0.5170141480018878,
+    "mean_spearman": 0.5560467310518211,
+    "by_workload": {
+      "stream": {
+        "r2": -0.08183994478082712,
+        "mae": 0.33557867232804234,
+        "mape": 53.58063736633456,
+        "rmse": 0.37541912928384247,
+        "target_variance": 0.13027761020674064,
+        "spearman": 0.20896159317211946
+      },
+      "quicksort": {
+        "r2": 0.01372547747788877,
+        "mae": 0.06747163466666668,
+        "mape": 6.816481890542214,
+        "rmse": 0.08420850179395298,
+        "target_variance": 0.007189754589065953,
+        "spearman": 0.5487624466571835
+      },
+      "matmul": {
+        "r2": -1.7332871772001819,
+        "mae": 0.6915323952962963,
+        "mape": 36.70581648133494,
+        "rmse": 0.8622268166712822,
+        "target_variance": 0.2719930381221866,
+        "spearman": 0.7849217638691321
+      },
+      "hash": {
+        "r2": -5208.615781550599,
+        "mae": 0.6068616658874072,
+        "mape": 61.259190339673275,
+        "rmse": 0.7462021442584738,
+        "target_variance": 0.00010688266917262215,
+        "spearman": 0.6815411205088492
+      }
+    },
+    "diagnostic_note": "Negative R2 on held-out workloads (e.g. hash) is driven by near-zero target variance where SS_tot -> 0, amplifying small baseline mean offsets into large negative R2 values. For deployment on known workloads, stratified cross-validation is the scientifically appropriate protocol."
+  },
+  "permutation_importance_test": {
+    "workload": 1.6393746685997461,
+    "issue_width": 0.6230022929515394,
+    "l2_size_kb": 0.29082653822721166,
+    "clk_freq_ghz": 0.03136602977324477,
+    "sq_entries": 0.006960138334380628,
+    "l1d_assoc": 0.004531248910974465,
+    "fetch_width": 0.0002701682040496663,
+    "l2_assoc": 0.00025776084198074755,
+    "l1d_size_kb": 9.110945294501515e-05,
+    "branch_predictor": 8.493232830411034e-05,
+    "decode_width": -0.00014267270934184377,
+    "rob_entries": -0.00019280238353547308,
+    "lq_entries": -0.0004099096227485462,
+    "l1i_assoc": -0.0007342874842021303,
+    "l1i_size_kb": -0.0008730425196616191,
+    "iq_entries": -0.0011546377136793925,
+    "phys_fp_regs": -0.0018740627245474133,
+    "phys_int_regs": -0.0020422420526130377,
+    "commit_width": -0.00405666150580372
+  },
+  "categorical_features": [
+    "workload",
+    "branch_predictor"
+  ],
+  "numerical_features": [
+    "fetch_width",
+    "decode_width",
+    "issue_width",
+    "commit_width",
+    "rob_entries",
+    "iq_entries",
+    "lq_entries",
+    "sq_entries",
+    "phys_int_regs",
+    "phys_fp_regs",
+    "l1d_size_kb",
+    "l1d_assoc",
+    "l1i_size_kb",
+    "l1i_assoc",
+    "l2_size_kb",
+    "l2_assoc",
+    "clk_freq_ghz"
+  ],
+  "training_timestamp": "2026-10-29 10:52:29 UTC"
+}

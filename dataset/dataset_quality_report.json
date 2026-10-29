@@ -1,0 +1,39 @@
+{
+  "total_runs_scanned": 300,
+  "valid_runs_harvested": 300,
+  "duplicates_removed": 0,
+  "missing_stats_count": 0,
+  "invalid_stats_count": 0,
+  "rejection_breakdown": {},
+  "provenance_audit": {
+    "total_manifests_found": 1,
+    "distinct_hosts": [
+      "ASHRIT"
+    ],
+    "distinct_gem5_hashes": [
+      "33c070f6f4b12e4e6ee781f3e2348c0b7f3980411b624da6c0e3544d4c35ecf7"
+    ],
+    "distinct_git_commits": [
+      "6198234c5c19ac5cd25f181f232e002339c672b9"
+    ],
+    "is_gem5_build_homogeneous": true,
+    "is_git_commit_homogeneous": true
+  },
+  "workload_distribution": {
+    "stream": 75,
+    "quicksort": 75,
+    "hash": 75,
+    "matmul": 75
+  },
+  "feature_summary": {
+    "ipc_min": 0.368858,
+    "ipc_max": 3.105611,
+    "ipc_mean": 1.1309352899999998,
+    "ipc_std": 0.45431757613561286,
+    "cycles_min": 341450,
+    "cycles_max": 3272338,
+    "sim_insts_min": 865654,
+    "sim_insts_max": 2802108
+  },
+  "sha256": "7e2e0fca49e641c8c26b7eb5285899968ef9cc04aa8ddf9880f959d67a12cfe1"
+}

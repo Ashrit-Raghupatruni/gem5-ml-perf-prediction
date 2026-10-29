@@ -1,0 +1,162 @@
+[
+  {
+    "candidate_id": "TOP_01",
+    "workload": "quicksort",
+    "params": {
+      "fetch_width": 2,
+      "decode_width": 2,
+      "issue_width": 2,
+      "commit_width": 2,
+      "rob_entries": 64,
+      "iq_entries": 43,
+      "lq_entries": 20,
+      "sq_entries": 20,
+      "phys_int_regs": 128,
+      "phys_fp_regs": 128,
+      "branch_predictor": "BiModeBP",
+      "l1d_size_kb": 16,
+      "l1d_assoc": 2,
+      "l1i_size_kb": 16,
+      "l1i_assoc": 4,
+      "l2_size_kb": 256,
+      "l2_assoc": 4,
+      "clk_freq_ghz": 2.4
+    },
+    "predicted_metrics": {
+      "predicted_ipc": 0.9491500980000018,
+      "uncertainty_std": 0.02278254374404218,
+      "ucb_ipc": 0.9833239136160651
+    },
+    "hardware_cost_proxy": 14.400000000000002,
+    "power_proxy": 14.45583288005226,
+    "energy_proxy": 15.230291721523093
+  },
+  {
+    "candidate_id": "TOP_02",
+    "workload": "matmul",
+    "params": {
+      "fetch_width": 4,
+      "decode_width": 4,
+      "issue_width": 2,
+      "commit_width": 2,
+      "rob_entries": 64,
+      "iq_entries": 53,
+      "lq_entries": 20,
+      "sq_entries": 17,
+      "phys_int_regs": 129,
+      "phys_fp_regs": 129,
+      "branch_predictor": "LocalBP",
+      "l1d_size_kb": 16,
+      "l1d_assoc": 4,
+      "l1i_size_kb": 64,
+      "l1i_assoc": 4,
+      "l2_size_kb": 256,
+      "l2_assoc": 4,
+      "clk_freq_ghz": 1.5
+    },
+    "predicted_metrics": {
+      "predicted_ipc": 1.4241029799999985,
+      "uncertainty_std": 0.024932420951235414,
+      "ucb_ipc": 1.4615016114268515
+    },
+    "hardware_cost_proxy": 17.4,
+    "power_proxy": 5.015330248348557,
+    "energy_proxy": 3.521746895262141
+  },
+  {
+    "candidate_id": "TOP_03",
+    "workload": "matmul",
+    "params": {
+      "fetch_width": 4,
+      "decode_width": 4,
+      "issue_width": 4,
+      "commit_width": 4,
+      "rob_entries": 64,
+      "iq_entries": 45,
+      "lq_entries": 24,
+      "sq_entries": 18,
+      "phys_int_regs": 138,
+      "phys_fp_regs": 138,
+      "branch_predictor": "BiModeBP",
+      "l1d_size_kb": 64,
+      "l1d_assoc": 4,
+      "l1i_size_kb": 16,
+      "l1i_assoc": 8,
+      "l2_size_kb": 256,
+      "l2_assoc": 4,
+      "clk_freq_ghz": 2.0
+    },
+    "predicted_metrics": {
+      "predicted_ipc": 2.5171043800000006,
+      "uncertainty_std": 0.12914297889961177,
+      "ucb_ipc": 2.710818848349418
+    },
+    "hardware_cost_proxy": 20.4,
+    "power_proxy": 10.86116015902537,
+    "energy_proxy": 4.314942298509436
+  },
+  {
+    "candidate_id": "TOP_04",
+    "workload": "matmul",
+    "params": {
+      "fetch_width": 8,
+      "decode_width": 8,
+      "issue_width": 8,
+      "commit_width": 8,
+      "rob_entries": 64,
+      "iq_entries": 45,
+      "lq_entries": 21,
+      "sq_entries": 20,
+      "phys_int_regs": 132,
+      "phys_fp_regs": 132,
+      "branch_predictor": "LocalBP",
+      "l1d_size_kb": 32,
+      "l1d_assoc": 2,
+      "l1i_size_kb": 64,
+      "l1i_assoc": 8,
+      "l2_size_kb": 256,
+      "l2_assoc": 8,
+      "clk_freq_ghz": 2.4
+    },
+    "predicted_metrics": {
+      "predicted_ipc": 2.9053126950000023,
+      "uncertainty_std": 0.19822221279284516,
+      "ucb_ipc": 3.20264601418927
+    },
+    "hardware_cost_proxy": 27.599999999999998,
+    "power_proxy": 22.486851146747956,
+    "energy_proxy": 7.739907372258922
+  },
+  {
+    "candidate_id": "TOP_05",
+    "workload": "matmul",
+    "params": {
+      "fetch_width": 8,
+      "decode_width": 8,
+      "issue_width": 8,
+      "commit_width": 8,
+      "rob_entries": 192,
+      "iq_entries": 32,
+      "lq_entries": 63,
+      "sq_entries": 52,
+      "phys_int_regs": 202,
+      "phys_fp_regs": 202,
+      "branch_predictor": "LocalBP",
+      "l1d_size_kb": 128,
+      "l1d_assoc": 2,
+      "l1i_size_kb": 16,
+      "l1i_assoc": 4,
+      "l2_size_kb": 512,
+      "l2_assoc": 4,
+      "clk_freq_ghz": 2.0
+    },
+    "predicted_metrics": {
+      "predicted_ipc": 3.0054919399999993,
+      "uncertainty_std": 0.18926733689391947,
+      "ucb_ipc": 3.2893929453408783
+    },
+    "hardware_cost_proxy": 35.6,
+    "power_proxy": 17.875659428395924,
+    "energy_proxy": 5.947665069564595
+  }
+]

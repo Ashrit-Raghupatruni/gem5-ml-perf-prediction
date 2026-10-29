@@ -1,6 +1,6 @@
 # Manual Execution Guide: Commands Reference
 
-This document provides a clean, sequential list of all commands to run the entire project manually from start to finish in **Ubuntu 24.04 (WSL)**.
+This document provides a clean, sequential list of all commands to run the entire project manually from start to finish in **Ubuntu 24.04 (WSL)** with a **fully user-configurable sample count**.
 
 ---
 
@@ -22,7 +22,7 @@ pip install -r requirements.txt --break-system-packages
 
 ## 🧪 Step 0: Run Unit Tests & Sanity Check
 
-Runs the automated unit test suite verifying design space generation, remainder distribution, stats parsing, and candidate screening:
+Runs the automated unit test suite verifying design space generation across arbitrary sample counts (e.g. 100, 180, 300, 501), remainder distribution, shard partitioning, stats parsing, and candidate screening:
 
 ```bash
 python3 -m unittest discover tests -v
@@ -49,23 +49,28 @@ file benchmarks/*-arm
 
 ### Step 2: Generate the Design Space (Latin Hypercube Sampling)
 
-Generates 180 Latin Hypercube Sampled configurations and splits them into 3 shards for team distribution:
+Generates a fully user-configurable number of Latin Hypercube Sampled configurations (e.g., 300, 500, or 1000) with independent parameter decoupling ($d=17$ orthogonal dimensions) and fair remainder distribution across workloads, and partitions them into team shards:
 
 ```bash
-python3 scripts/generate_design_space.py --samples 180 --shards 3 --seed 42 --output-dir configs
+# Example A: 300 configurations (100 per shard for 3 team laptops)
+python3 scripts/generate_design_space.py --samples 300 --shards 3 --seed 42 --output-dir configs
+
+# Example B: 500 configurations (167 / 167 / 166 per shard)
+python3 scripts/generate_design_space.py --samples 500 --shards 3 --seed 42 --output-dir configs
+
+# Example C: 1000 configurations for large-scale exploration
+python3 scripts/generate_design_space.py --samples 1000 --shards 4 --seed 42 --output-dir configs
 ```
 
 Outputs created:
-- `configs/sweep_configs.json` (Master 180 configurations)
-- `configs/shards/shard_1.json` (60 configs for Laptop 1)
-- `configs/shards/shard_2.json` (60 configs for Laptop 2)
-- `configs/shards/shard_3.json` (60 configs for Laptop 3)
+- `configs/sweep_configs.json` (Master configurations file matching the requested count)
+- `configs/shards/shard_*.json` (Fairly partitioned shard files with zero overlapping or missing designs)
 
 ---
 
 ### Step 3: Run the Parallel Simulation Sweep
 
-#### Option A: Running All 180 Configurations on One Machine
+#### Option A: Running All Configurations on One Machine
 ```bash
 python3 scripts/run_parallel_sweep.py \
   --shard configs/sweep_configs.json \
@@ -98,7 +103,7 @@ python3 scripts/run_parallel_sweep.py \
 
 Extracts cycle-accurate counters (`simInsts`, `ipc`, `l1d_mpki`, `l2_mpki`, `branch_mispred_rate`, `dram_total_reqs`) into a structured CSV file with strict validation and generates a quality report:
 
-#### If you ran all 180 on one machine:
+#### If you ran all configurations on one machine:
 ```bash
 python3 scripts/parse_dataset.py \
   --configs configs/sweep_configs.json \
@@ -106,8 +111,8 @@ python3 scripts/parse_dataset.py \
   --output dataset/dataset_cleaned.csv
 ```
 
-#### If combining results from 3 team laptops:
-Place the output folders from all 3 laptops into `outputs/` and run:
+#### If combining results from multiple team laptops:
+Place the output folders from all laptops into `outputs/` and run:
 ```bash
 python3 scripts/parse_dataset.py \
   --configs configs/sweep_configs.json \
@@ -130,7 +135,7 @@ wc -l dataset/dataset_cleaned.csv
 
 ### Step 5: Train, Cross-Validate & Evaluate Models
 
-Partitions data into 80% train and 20% untouched test split (stratified by workload). Performs 5-Fold Cross-Validation on the training partition, Leave-One-Workload-Out validation, computes 95% bootstrap confidence intervals, and permutation importance on the test set:
+Partitions data into 80% train and 20% untouched test split (stratified by workload). Evaluates KNN, Random Forest, and HistGradientBoosting under 5-Fold Cross-Validation, Leave-One-Workload-Out validation, computes 95% bootstrap confidence intervals, and permutation importance on the test set:
 
 ```bash
 python3 ml/train_models.py \
@@ -140,7 +145,7 @@ python3 ml/train_models.py \
 ```
 
 Outputs created:
-- `ml/saved_models/best_model_ipc.joblib` (Trained pipeline)
+- `ml/saved_models/best_model_ipc.joblib` (Trained champion pipeline)
 - `ml/saved_models/model_metadata.json` (Full metrics, 95% CIs, workload generalization)
 - `ml/saved_models/oof_predictions.csv` (Out-of-fold cross-validation predictions)
 - `ml/saved_models/test_predictions.csv` (Held-out test set predictions)
