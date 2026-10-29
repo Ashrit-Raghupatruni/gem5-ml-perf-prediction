@@ -18,32 +18,41 @@ This repository implements an end-to-end Machine Learning (ML) surrogate framewo
 
 ---
 
-## 🏆 Reference Experimental Results (Empirically Validated)
+## 🏆 Verified Experimental Results (300-Sample Rigorous Benchmark)
 
-| Metric | Target KPI | Reference Result | Status |
-| :--- | :--- | :--- | :--- |
-| **Champion Model ($R^2$)** | $\ge 0.88$ | **0.8956** on held-out 20% test partition (95% CI: $[0.7183, 0.9767]$) | **MET** |
-| **Held-Out Test MAPE** | $\le 8.5\%$ | **7.57%** (95% CI: $[3.67\%, 13.04\%]$) | **MET** |
-| **Spearman Rank Correlation ($\rho$)** | $\ge 0.90$ | **0.9474** (Ranking fidelity on held-out test split) | **EXCEEDED** |
-| **Screening Speed** | $< 0.5\text{ ms/config}$ | **0.0687 ms/config** (5,000 in 343.7 ms) | **EXCEEDED** |
-| **Top-5 Ground-Truth Validation Error** | $\le 7.0\%$ | **5.45%** (Cycle-accurate gem5 validation) | **MET** |
-| **Host Wall-Clock Compute Speedup** | $\ge 20.0\times$ | **23.3×** (Measured 4-worker parallel execution: 6.9 min vs 2.66 hrs) | **EXCEEDED** |
-| **Aggregate Core-Hour Reduction** | $\ge 25.0\times$ | **27.0×** (0.39 core-hours vs 10.63 core-hours) | **EXCEEDED** |
+> **Experiment Lineage & Provenance**:
+> - **Dataset Size**: 300 completed cycle-accurate gem5 simulations (75 per workload: matmul, stream, quicksort, hash).
+> - **Dataset SHA-256**: 7e2e0fca49e641c8c26b7eb5285899968ef9cc04aa8ddf9880f959d67a12cfe1 (recorded in [dataset/dataset_quality_report.json](dataset/dataset_quality_report.json)).
+> - **Simulator Binary**: /home/ashrit/gem5/build/ARM/gem5.opt (SHA-256: 33c070f6f4b12e4e6ee781f3e2348c0b7f3980411b624da6c0e3544d4c35ecf7).
+> - **Champion Model**: Random Forest (200 trees, max depth 12) selected via 5-fold CV on 80% train split (240 samples), evaluated on untouched 20% test split (60 samples). Full metadata saved in [ml/saved_models/model_metadata.json](ml/saved_models/model_metadata.json).
+
+| Metric | Target KPI | Measured Result | Evaluation Split / Source | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Champion Model (^2$)** | $\ge 0.88$ | **0.9300** | Untouched 20% test partition (95% CI: $[0.7945, 0.9885]$) | **MET** |
+| **Held-Out Test MAPE** | $\le 8.5\%$ | **4.59%** | Untouched 20% test partition (95% CI: $[2.20\%, 7.84\%]$) | **MET** |
+| **Held-Out Test RMSE** | $\le 0.15$ | **0.1173** | Untouched 20% test partition (95% CI: $[0.0464, 0.1736]$) | **MET** |
+| **Spearman Rank Correlation ($\rho$)** | $\ge 0.90$ | **0.9018** | Ranking fidelity on held-out test split (95% CI: $[0.7682, 0.9768]$) | **MET** |
+| **Top-5 Validation Error (MAPE)** | $\le 7.0\%$ | **3.29%** | Ground-truth cycle-accurate gem5 validation ([dataset/validation_results.csv](dataset/validation_results.csv)) | **MET** |
+| **Optimizer Top-K Hit Rate** | $\ge 50\%$ | **60.0%** | $\ge 90 percentile IPC designs in reference dataset | **MET** |
+| **Host Wall-Clock Speedup** | $\ge 20.0\times$ | **79.6×** *(Extrapolated)* | Measured ML-guided (.8$ min) vs. Extrapolated 5,000-point gem5 (.36$ hrs) | **EXCEEDED** |
+| **Aggregate Core-Hour Speedup** | $\ge 25.0\times$ | **109.7×** *(Extrapolated)* | Measured ML-guided (.16$ core-hrs) vs. Extrapolated 5,000-point (.04$ core-hrs) | **EXCEEDED** |
 
 ---
 
-## 🔬 Empirical Ground-Truth gem5 Validation (Reference Top-5 Configurations)
+## 🔬 Empirical Ground-Truth gem5 Validation (Verified Top-5 Candidates)
 
-Five Pareto-optimal candidate microarchitectures were selected from 5,000 screened configurations and simulated in gem5 to verify surrogate accuracy:
+Five Pareto-optimal candidate microarchitectures were selected from 5,000 screened configurations and independently simulated in gem5:
 
-| Candidate ID | Workload | Width | ROB | L1D Cache | L2 Cache | Clock | Predicted IPC | Simulated IPC | Validation Error (%) |
+| Candidate ID | Workload | Pipeline Widths (F/D/I/C) | ROB | L1D Cache | L2 Cache | Clock | Predicted IPC | Simulated IPC | Validation Error (%) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TOP_01** | matmul | 2-wide | 64 ent | 16 KiB (4-way) | 512 KiB (8-way) | 1.5 GHz | 1.4607 | **1.4133** | **3.35%** |
-| **TOP_02** | matmul | 4-wide | 96 ent | 16 KiB (4-way) | 256 KiB (8-way) | 3.0 GHz | 2.4122 | **2.2692** | **6.30%** |
-| **TOP_03** | matmul | 8-wide | 96 ent | 16 KiB (4-way) | 256 KiB (8-way) | 1.5 GHz | 3.0722 | **3.0609** | **0.37%** |
-| **TOP_04** | matmul | 8-wide | 192 ent | 16 KiB (4-way) | 512 KiB (8-way) | 3.0 GHz | 3.7933 | **3.3374** | **13.66%** |
-| **TOP_05** | matmul | 8-wide | 192 ent | 128 KiB (4-way) | 512 KiB (8-way) | 1.5 GHz | 3.9983 | **4.1455** | **3.55%** |
-| **Average** | — | — | — | — | — | — | — | — | **5.45%** |
+| **TOP_01** | quicksort | 2 / 2 / 2 / 2 | 64 ent | 16 KiB (2-way) | 256 KiB (4-way) | 2.4 GHz | 0.9492 | **0.9546** | **0.57%** |
+| **TOP_02** | matmul | 4 / 4 / 2 / 2 | 64 ent | 16 KiB (4-way) | 256 KiB (4-way) | 1.5 GHz | 1.4241 | **1.4090** | **1.07%** |
+| **TOP_03** | matmul | 4 / 4 / 4 / 4 | 64 ent | 64 KiB (4-way) | 256 KiB (4-way) | 2.0 GHz | 2.5171 | **2.4920** | **1.01%** |
+| **TOP_04** | matmul | 8 / 8 / 8 / 8 | 64 ent | 32 KiB (2-way) | 256 KiB (8-way) | 2.4 GHz | 2.9053 | **2.6833** | **8.27%** |
+| **TOP_05** | matmul | 8 / 8 / 8 / 8 | 192 ent | 128 KiB (2-way) | 512 KiB (4-way) | 2.0 GHz | 3.0055 | **2.8480** | **5.53%** |
+| **Average** | — | — | — | — | — | — | — | — | **3.29%** |
+
+*All 5 validation simulations succeeded (0 failed). Full measurements saved in [dataset/validation_results.csv](dataset/validation_results.csv) and [dataset/validation_summary.json](dataset/validation_summary.json).*
 
 ---
 

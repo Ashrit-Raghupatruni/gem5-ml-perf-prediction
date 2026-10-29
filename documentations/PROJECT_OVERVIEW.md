@@ -496,7 +496,7 @@ All speedup calculations in `ml/validate_and_evaluate.py` use **directly measure
 - **OS**: Linux (tested on Ubuntu 24.04 LTS / WSL2).
 - **Simulator**: `gem5 v24+` or `v25.1+` compiled for ARM ISA (`build/ARM/gem5.opt`).
 - **Python**: Python 3.10, 3.11, or 3.12.
-- **Dependencies**: Listed in [`requirements.txt`](file:///c:/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/requirements.txt):
+- **Dependencies**: Listed in [`requirements.txt`](../requirements.txt):
   ```text
   numpy>=1.24.0
   pandas>=2.0.0
@@ -663,15 +663,15 @@ python3 -m unittest discover tests -v
 
 ## 26. References and Source Files
 
-- **Architecture Configuration Script**: [`configs/arm_o3_parametric.py`](file:///c:/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/configs/arm_o3_parametric.py)
-- **Design Space Generation**: [`scripts/generate_design_space.py`](file:///c:/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/scripts/generate_design_space.py)
-- **Parallel Sweep Runner**: [`scripts/run_parallel_sweep.py`](file:///c:/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/scripts/run_parallel_sweep.py)
-- **Dataset Harvester & Quality Auditing**: [`scripts/parse_dataset.py`](file:///c:/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/scripts/parse_dataset.py)
-- **ML Model Training & Evaluation Engine**: [`ml/train_models.py`](file:///c:/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/ml/train_models.py)
-- **Candidate Screening & Pareto Optimizer**: [`ml/predict_and_screen.py`](file:///c:/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/ml/predict_and_screen.py)
-- **Active Learning Benchmarking Engine**: [`ml/benchmark_active_learning.py`](file:///c:/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/ml/benchmark_active_learning.py)
-- **Ground-Truth Validation & Speedup Accounting**: [`ml/validate_and_evaluate.py`](file:///c:/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/ml/validate_and_evaluate.py)
-- **Automated Regression Test Suite**: [`tests/test_pipeline.py`](file:///c:/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/tests/test_pipeline.py)
-- **Dataset Quality Report**: [`dataset/dataset_quality_report.json`](file:///c:/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/dataset/dataset_quality_report.json)
-- **Model Training Metadata**: [`ml/saved_models/model_metadata.json`](file:///c:/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/ml/saved_models/model_metadata.json)
-- **Defensible Speedup and Validation Summary**: [`dataset/validation_summary.json`](file:///c:/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/dataset/validation_summary.json)
+- **Architecture Configuration Script**: [`configs/arm_o3_parametric.py`](../configs/arm_o3_parametric.py)
+- **Design Space Generation**: [`scripts/generate_design_space.py`](../scripts/generate_design_space.py)
+- **Parallel Sweep Runner**: [`scripts/run_parallel_sweep.py`](../scripts/run_parallel_sweep.py)
+- **Dataset Harvester & Quality Auditing**: [`scripts/parse_dataset.py`](../scripts/parse_dataset.py)
+- **ML Model Training & Evaluation Engine**: [`ml/train_models.py`](../ml/train_models.py)
+- **Candidate Screening & Pareto Optimizer**: [`ml/predict_and_screen.py`](../ml/predict_and_screen.py)
+- **Active Learning Benchmarking Engine**: [`ml/benchmark_active_learning.py`](../ml/benchmark_active_learning.py)
+- **Ground-Truth Validation & Speedup Accounting**: [`ml/validate_and_evaluate.py`](../ml/validate_and_evaluate.py)
+- **Automated Regression Test Suite**: [`tests/test_pipeline.py`](../tests/test_pipeline.py)
+- **Dataset Quality Report**: [`dataset/dataset_quality_report.json`](../dataset/dataset_quality_report.json)
+- **Model Training Metadata**: [`ml/saved_models/model_metadata.json`](../ml/saved_models/model_metadata.json)
+- **Defensible Speedup and Validation Summary**: [`dataset/validation_summary.json`](../dataset/validation_summary.json)
