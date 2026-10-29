@@ -7,13 +7,20 @@ Strictly adheres to: documents/schema.md, documents/rules.md
 
 import os
 import sys
+
+# Ensure repository root is in sys.path when executed directly as a script
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import json
 import argparse
 import numpy as np
 import pandas as pd
 import joblib
 
-from ml.predict_and_screen import generate_candidate_design_space, predict_with_uncertainty
+try:
+    from ml.predict_and_screen import generate_candidate_design_space, predict_with_uncertainty
+except ModuleNotFoundError:
+    from predict_and_screen import generate_candidate_design_space, predict_with_uncertainty
 
 
 def select_active_learning_queries(model_path, pool_size=2000, n_queries=15, strategy='uncertainty', output_json="configs/active_queries.json"):
