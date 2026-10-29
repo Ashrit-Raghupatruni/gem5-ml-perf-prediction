@@ -24,16 +24,18 @@
 
 ### RULE 3: RIGOROUS ML ACCEPTANCE CRITERIA
 - No machine learning model may be reported as acceptable unless:
-  1. It undergoes 5-Fold Stratified Cross-Validation across workloads.
-  2. The model achieves $R^2 \ge 0.85$ and $\text{MAPE} \le 8.5\%$ on holdout folds.
-  3. The Spearman rank correlation satisfies $\rho \ge 0.88$ (ensuring ranking fidelity).
+  1. It undergoes 5-Fold Stratified Cross-Validation strictly on training data, evaluated against an untouched 20% test partition.
+  2. It reports bootstrap 95% confidence intervals and permutation feature importance on held-out test data.
+  3. Workload generalization is measured using GroupKFold (Leave-One-Workload-Out).
+  4. The model achieves $R^2 \ge 0.85$ and $\text{MAPE} \le 8.5\%$ on holdout folds.
+  5. The Spearman rank correlation satisfies $\rho \ge 0.88$ (ensuring ranking fidelity).
 
 ---
 
 ### RULE 4: GROUND-TRUTH EMPIRICAL VALIDATION REQUIRED
 - Under no circumstances may performance optimization claims be made based solely on ML predictions.
 - The predicted top configurations (top-5) **MUST** be simulated through actual gem5 runs, and the validation delta ($\|\text{IPC}_{\text{pred}} - \text{IPC}_{\text{sim}}\|$) must be reported explicitly.
-- The simulation time reduction ratio must be quantitatively proven using measured wallclock runtimes.
+- The simulation time reduction ratio must be quantitatively proven using measured wallclock runtimes, distinguishing host wall-clock from aggregate core-hours.
 
 ---
 
@@ -89,3 +91,11 @@
 | **PH6-01** | Screen 5,000 Candidates & Identify Pareto Optimal Top-5 | Phase 6 | `[COMPLETED]` | 2026-10-22 14:36 | `dataset/top5_candidates.json` & `pareto_frontier.png` |
 | **PH7-01** | Run Ground-Truth Validation in gem5 | Phase 7 | `[COMPLETED]` | 2026-10-22 14:36 | `dataset/validation_results.csv` (Mean Error: 2.57%) |
 | **PH7-02** | Compute Speedup & Final Evaluation Report | Phase 7 | `[COMPLETED]` | 2026-10-22 14:36 | **26.9× speedup** (12.11h down to 0.45h) & `speedup_comparison.png` |
+| **REV-01** | Parameter Propagation Hardening (discrete widths & queues) | Sprint 1 | `[COMPLETED]` | 2026-10-29 08:05 | `arm_o3_parametric.py`, `run_parallel_sweep.py`, `validate_and_evaluate.py` |
+| **REV-02** | Strict Counter Validation & Quality Report Generator | Sprint 1 | `[COMPLETED]` | 2026-10-29 08:08 | `scripts/parse_dataset.py`, `dataset/dataset_quality_report.json` |
+| **REV-03** | Remainder Distribution & LHS Deduplication | Sprint 1 | `[COMPLETED]` | 2026-10-29 08:10 | `scripts/generate_design_space.py` (seed + remainder handling) |
+| **REV-04** | Untouched Test Split, OOF, 95% Bootstrap CI & Grouped CV | Sprint 2 | `[COMPLETED]` | 2026-10-29 08:15 | `ml/train_models.py`, `oof_predictions.csv`, `test_predictions.csv` |
+| **REV-05** | Defensible Wall-Clock & Core-Hour Speedup Formulas | Sprint 3 | `[COMPLETED]` | 2026-10-29 08:20 | `ml/validate_and_evaluate.py`, `dataset/validation_summary.json` |
+| **REV-06** | Multi-Objective Pareto & Tree Ensemble Uncertainty Bands | Sprint 3 | `[COMPLETED]` | 2026-10-29 08:25 | `ml/predict_and_screen.py` (UCB + Power/Energy proxies) |
+| **REV-07** | Active Learning & Adaptive Sampling Module | Sprint 3 | `[COMPLETED]` | 2026-10-29 08:30 | `ml/active_learning.py` (`uncertainty`, `ucb`, `random`) |
+| **REV-08** | Automated Regression Test Suite & GitHub Actions CI | Sprint 4 | `[COMPLETED]` | 2026-10-29 08:44 | `tests/test_pipeline.py` & `.github/workflows/ci.yml` |

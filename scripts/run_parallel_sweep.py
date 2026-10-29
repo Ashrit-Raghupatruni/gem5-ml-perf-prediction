@@ -9,9 +9,41 @@ import os
 import sys
 import json
 import time
+import re
 import argparse
 import subprocess
 from multiprocessing import Pool
+
+
+def verify_simulation_output(run_out_dir):
+    """
+    Verifies that simulation completed properly:
+    1. stats.txt exists and is non-empty
+    2. simInsts exists and is > 0
+    """
+    stats_file = os.path.join(run_out_dir, "stats.txt")
+    if not os.path.exists(stats_file) or os.path.getsize(stats_file) == 0:
+        return False, "Missing or empty stats.txt"
+    
+    sim_insts = 0
+    try:
+        with open(stats_file, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if 'simInsts' in line:
+                    parts = re.split(r'\s+', line.strip(), maxsplit=2)
+                    if len(parts) >= 2 and parts[0] == 'simInsts':
+                        try:
+                            sim_insts = int(parts[1])
+                            break
+                        except ValueError:
+                            pass
+    except Exception as e:
+        return False, f"Error reading stats.txt: {e}"
+        
+    if sim_insts <= 0:
+        return False, f"Invalid simInsts ({sim_insts})"
+        
+    return True, f"Valid run (simInsts={sim_insts})"
 
 
 def run_single_simulation(task_args):
@@ -23,12 +55,21 @@ def run_single_simulation(task_args):
     
     bench_bin = os.path.join(benchmarks_dir, f"{wl}-arm")
     
+    # Retrieve discrete widths or fallback to fetch_width
+    fetch_w = cfg.get('fetch_width', 4)
+    decode_w = cfg.get('decode_width', fetch_w)
+    issue_w = cfg.get('issue_width', fetch_w)
+    commit_w = cfg.get('commit_width', fetch_w)
+    
     cmd = [
         gem5_bin,
         "-d", run_out_dir,
         script_path,
         "--binary", bench_bin,
-        "--width", str(cfg['fetch_width']),
+        "--fetch-width", str(fetch_w),
+        "--decode-width", str(decode_w),
+        "--issue-width", str(issue_w),
+        "--commit-width", str(commit_w),
         "--rob", str(cfg['rob_entries']),
         "--iq", str(cfg['iq_entries']),
         "--lq", str(cfg['lq_entries']),
@@ -47,23 +88,35 @@ def run_single_simulation(task_args):
     log_file = os.path.join(run_out_dir, "run.log")
     t0 = time.perf_counter()
     status = "SUCCESS"
+    details = ""
     try:
         with open(log_file, "w") as f:
             proc = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT, timeout=timeout)
         duration = time.perf_counter() - t0
         if proc.returncode != 0:
             status = f"FAILED (Exit code {proc.returncode})"
+            details = f"Process exit code: {proc.returncode}"
+        else:
+            # Rigorous check on outputs
+            is_valid, reason = verify_simulation_output(run_out_dir)
+            if not is_valid:
+                status = f"FAILED ({reason})"
+                details = reason
+            else:
+                details = reason
     except subprocess.TimeoutExpired:
         duration = timeout
         status = "TIMEOUT"
+        details = f"Timed out after {timeout}s"
         
-    print(f"[{cid}] ({wl}) Width={cfg['fetch_width']} ROB={cfg['rob_entries']} Freq={cfg['clk_freq_ghz']}GHz -> {status} ({duration:.1f}s)")
+    print(f"[{cid}] ({wl}) FetchW={fetch_w} IssueW={issue_w} ROB={cfg['rob_entries']} Freq={cfg['clk_freq_ghz']}GHz -> {status} ({duration:.1f}s)")
     return {
         'config_id': cid,
         'workload': wl,
         'status': status,
         'duration_sec': duration,
-        'output_dir': run_out_dir
+        'output_dir': run_out_dir,
+        'details': details
     }
 
 
@@ -82,17 +135,34 @@ def execute_parallel_sweep(shard_json, gem5_bin, script_path, benchmarks_dir, ou
     print(f"   Outputs Dir   : {out_dir}")
     print("=" * 110)
     
+    os.makedirs(out_dir, exist_ok=True)
     tasks = [(cfg, gem5_bin, script_path, benchmarks_dir, out_dir, timeout) for cfg in configs]
     
     t_start = time.perf_counter()
     with Pool(processes=workers) as pool:
         results = pool.map(run_single_simulation, tasks)
         
-    total_time = time.perf_counter() - t_start
+    total_wall_clock = time.perf_counter() - t_start
+    total_cpu_seconds = sum(r['duration_sec'] for r in results)
     success_count = sum(1 for r in results if r['status'] == "SUCCESS")
     
+    manifest = {
+        'shard_file': shard_json,
+        'total_configs': len(configs),
+        'success_count': success_count,
+        'failed_count': len(configs) - success_count,
+        'workers': workers,
+        'total_wall_clock_sec': total_wall_clock,
+        'total_cpu_seconds': total_cpu_seconds,
+        'simulations': results
+    }
+    manifest_path = os.path.join(out_dir, "simulation_manifest.json")
+    with open(manifest_path, 'w') as f:
+        json.dump(manifest, f, indent=2)
+    print(f"[INFO] Saved run manifest: {manifest_path}")
+    
     print("=" * 110)
-    print(f"   SWEEP FINISHED: {success_count}/{len(configs)} Succeeded in {total_time / 60.0:.2f} Minutes")
+    print(f"   SWEEP FINISHED: {success_count}/{len(configs)} Succeeded in {total_wall_clock / 60.0:.2f} Minutes (Wall-clock) | Aggregate CPU: {total_cpu_seconds / 60.0:.2f} Core-Minutes")
     print("=" * 110)
 
 

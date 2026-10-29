@@ -15,9 +15,14 @@ from scipy.stats import qmc
 def generate_lhs_design_space(num_samples=180, seed=42):
     """
     Samples microarchitectural space uniformly across 4 benchmarks.
+    Handles remainders cleanly so exactly num_samples are produced without bias.
     """
     workloads = ['matmul', 'stream', 'quicksort', 'hash']
-    samples_per_workload = num_samples // len(workloads)
+    base_samples = num_samples // len(workloads)
+    remainder = num_samples % len(workloads)
+    
+    # Distribute any remainder evenly across the first workloads
+    wl_samples = {wl: base_samples + (1 if idx < remainder else 0) for idx, wl in enumerate(workloads)}
     
     widths = [2, 4, 8]
     rob_sizes = [64, 96, 128, 192, 256]
@@ -33,10 +38,15 @@ def generate_lhs_design_space(num_samples=180, seed=42):
     sampler = qmc.LatinHypercube(d=10, seed=seed)
     
     all_configs = []
+    seen_hashes = set()
     cfg_counter = 1
     
     for wl in workloads:
-        sample_matrix = sampler.random(n=samples_per_workload)
+        count = wl_samples[wl]
+        if count == 0:
+            continue
+            
+        sample_matrix = sampler.random(n=count)
         for s in sample_matrix:
             w = widths[int(s[0] * len(widths))]
             rob = rob_sizes[int(s[1] * len(rob_sizes))]
@@ -55,6 +65,14 @@ def generate_lhs_design_space(num_samples=180, seed=42):
             l2_a = l2_assocs[int(s[7] * len(l2_assocs))]
             freq = freqs[int(s[8] * len(freqs))]
             bp = branch_preds[int(s[9] * len(branch_preds))]
+            
+            cfg_tuple = (wl, w, rob, iq, lq, sq, phys_regs, bp, l1d_s, l1d_a, l1i_s, l1i_a, l2_s, l2_a, freq)
+            if cfg_tuple in seen_hashes:
+                # In rare discrete collision, slightly adjust frequency or l1d
+                freq = freqs[(freqs.index(freq) + 1) % len(freqs)]
+                cfg_tuple = (wl, w, rob, iq, lq, sq, phys_regs, bp, l1d_s, l1d_a, l1i_s, l1i_a, l2_s, l2_a, freq)
+                
+            seen_hashes.add(cfg_tuple)
             
             all_configs.append({
                 'config_id': f"CFG_{cfg_counter:03d}",
@@ -93,9 +111,12 @@ def save_and_split_shards(configs, output_dir, num_shards=3):
     shards_dir = os.path.join(output_dir, "shards")
     os.makedirs(shards_dir, exist_ok=True)
     
-    shard_size = len(configs) // num_shards
-    for i in range(num_shards):
-        shard_configs = configs[i * shard_size : (i + 1) * shard_size]
+    # Robust partitioning without dropping any remainder configs
+    total_configs = len(configs)
+    k, m = divmod(total_configs, num_shards)
+    shards = [configs[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(num_shards)]
+    
+    for i, shard_configs in enumerate(shards):
         shard_path = os.path.join(shards_dir, f"shard_{i+1}.json")
         with open(shard_path, 'w') as f:
             json.dump(shard_configs, f, indent=2)
@@ -106,8 +127,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="LHS Design Space Generator & Sharder")
     parser.add_argument("--samples", type=int, default=180, help="Total simulation sample points (default: 180)")
     parser.add_argument("--shards", type=int, default=3, help="Number of team shards to split across laptops (default: 3)")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for LHS sampling (default: 42)")
     parser.add_argument("--output-dir", type=str, default="configs", help="Directory to save config files")
     args = parser.parse_args()
     
-    configs = generate_lhs_design_space(num_samples=args.samples)
+    configs = generate_lhs_design_space(num_samples=args.samples, seed=args.seed)
     save_and_split_shards(configs, args.output_dir, num_shards=args.shards)

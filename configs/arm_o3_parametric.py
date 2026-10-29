@@ -31,7 +31,11 @@ requires(isa_required=ISA.ARM)
 
 parser = argparse.ArgumentParser(description="Parametric ARM O3 Simulation Engine")
 parser.add_argument("--binary", type=str, required=True, help="Path to static ARM64 binary")
-parser.add_argument("--width", type=int, default=4, choices=[2, 4, 8], help="Pipeline width")
+parser.add_argument("--width", type=int, default=None, choices=[2, 4, 8], help="Uniform pipeline width fallback")
+parser.add_argument("--fetch-width", type=int, default=4, choices=[2, 4, 8], help="Fetch stage width")
+parser.add_argument("--decode-width", type=int, default=4, choices=[2, 4, 8], help="Decode stage width")
+parser.add_argument("--issue-width", type=int, default=4, choices=[2, 4, 8], help="Issue stage width")
+parser.add_argument("--commit-width", type=int, default=4, choices=[2, 4, 8], help="Commit stage width")
 parser.add_argument("--rob", type=int, default=128, help="Number of ROB entries (e.g. 64, 96, 128, 192, 256)")
 parser.add_argument("--iq", type=int, default=64, help="Instruction Queue entries")
 parser.add_argument("--lq", type=int, default=32, help="Load Queue entries")
@@ -48,6 +52,12 @@ parser.add_argument("--l2-assoc", type=int, default=8, help="L2 cache associativ
 parser.add_argument("--clk-freq", type=str, default="2.4GHz", help="Clock frequency")
 
 args = parser.parse_args()
+
+# Apply uniform width fallback if specified
+fetch_w = args.width if args.width is not None else args.fetch_width
+decode_w = args.width if args.width is not None else args.decode_width
+issue_w = args.width if args.width is not None else args.issue_width
+commit_w = args.width if args.width is not None else args.commit_width
 
 
 class ParametricTwoLevelCacheHierarchy(AbstractClassicCacheHierarchy, AbstractTwoLevelCacheHierarchy):
@@ -137,13 +147,13 @@ for core in processor.get_cores():
     sim_core = core.get_simobject()
     
     # Configure Pipeline Widths
-    sim_core.fetchWidth = args.width
-    sim_core.decodeWidth = args.width
-    sim_core.renameWidth = args.width
-    sim_core.issueWidth = args.width
-    sim_core.dispatchWidth = args.width
-    sim_core.wbWidth = args.width
-    sim_core.commitWidth = args.width
+    sim_core.fetchWidth = fetch_w
+    sim_core.decodeWidth = decode_w
+    sim_core.renameWidth = decode_w
+    sim_core.issueWidth = issue_w
+    sim_core.dispatchWidth = issue_w
+    sim_core.wbWidth = commit_w
+    sim_core.commitWidth = commit_w
     
     # Configure Execution Buffers
     sim_core.numROBEntries = args.rob
@@ -181,6 +191,6 @@ board.set_se_binary_workload(BinaryResource(local_path=args.binary))
 
 # 6. Run simulation
 simulator = Simulator(board=board)
-print(f"=== Starting ARM O3 Simulation: Width={args.width}, ROB={args.rob}, Freq={args.clk_freq} ===")
+print(f"=== Starting ARM O3 Simulation: FetchW={fetch_w}, CommitW={commit_w}, ROB={args.rob}, Freq={args.clk_freq} ===")
 simulator.run()
 print("=== Finished ARM O3 Simulation Successfully ===")

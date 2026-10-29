@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Large-Scale Candidate Screening & Pareto Frontier Optimizer
+Large-Scale Candidate Screening, Uncertainty-Aware Screening & Multi-Objective Pareto Frontier Optimizer
 Project: ML-Based Microarchitectural Performance Prediction (ARM gem5)
 Strictly adheres to: documents/schema.md, documents/architecture.md, documents/design_system.md
 """
@@ -10,7 +10,6 @@ import sys
 import json
 import time
 import argparse
-import itertools
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -43,9 +42,11 @@ def generate_candidate_design_space(num_candidates=5000, workloads=None):
     np.random.seed(42)
     
     total_samples_per_workload = num_candidates // len(workloads)
+    remainder = num_candidates % len(workloads)
     
-    for wl in workloads:
-        for _ in range(total_samples_per_workload):
+    for idx, wl in enumerate(workloads):
+        count = total_samples_per_workload + (1 if idx < remainder else 0)
+        for _ in range(count):
             w = int(np.random.choice(widths))
             rob = int(np.random.choice(rob_sizes))
             
@@ -90,12 +91,18 @@ def generate_candidate_design_space(num_candidates=5000, workloads=None):
     return df_candidates
 
 
-def compute_hardware_cost_proxy(df):
+def compute_cost_and_energy_proxies(df):
     """
-    Computes an estimated hardware complexity / area proxy:
-    Cost = 1.5*Width + 0.05*ROB + 0.8*log2(L1D) + 0.4*log2(L2) + 0.2*Assoc
+    Computes:
+    1. Area / Complexity Proxy:
+       Area = 1.5*Width + 0.05*ROB + 0.8*log2(L1D) + 0.4*log2(L2) + 0.2*L1D_assoc + 0.1*L2_assoc
+    2. Dynamic Power Proxy:
+       Dynamic Power ~ V^2 * f * C_eff ~ f^3 (assuming standard voltage-frequency scaling)
+       Power Proxy = (clk_freq_ghz)^2.5 * (1.0 + 0.15*Width + 0.005*ROB)
+    3. Energy per Instruction Proxy (EDAP):
+       Energy ~ Power / IPC
     """
-    cost = (
+    area_cost = (
         1.5 * df['fetch_width'] +
         0.05 * df['rob_entries'] +
         0.8 * np.log2(df['l1d_size_kb']) +
@@ -103,7 +110,34 @@ def compute_hardware_cost_proxy(df):
         0.2 * df['l1d_assoc'] +
         0.1 * df['l2_assoc']
     )
-    return cost
+    
+    power_proxy = (df['clk_freq_ghz'] ** 2.5) * (1.0 + 0.15 * df['fetch_width'] + 0.005 * df['rob_entries'])
+    ipc_safe = np.maximum(df['predicted_ipc'], 0.05)
+    energy_proxy = power_proxy / ipc_safe
+    
+    return area_cost, power_proxy, energy_proxy
+
+
+def predict_with_uncertainty(pipeline, df_features):
+    """
+    Computes mean prediction and epistemic uncertainty (std dev).
+    If the regressor is RandomForest, computes the std dev across all trees.
+    Otherwise falls back to zero uncertainty.
+    """
+    regressor = pipeline.named_steps['regressor']
+    preprocessor = pipeline.named_steps['preprocessor']
+    
+    X_trans = preprocessor.transform(df_features)
+    mean_pred = regressor.predict(X_trans)
+    
+    if hasattr(regressor, 'estimators_'):
+        # Random Forest: predictions across individual decision trees
+        tree_preds = np.array([tree.predict(X_trans) for tree in regressor.estimators_])
+        std_pred = np.std(tree_preds, axis=0)
+    else:
+        std_pred = np.zeros_like(mean_pred)
+        
+    return mean_pred, std_pred
 
 
 def find_pareto_frontier(df, cost_col='hardware_cost_proxy', perf_col='predicted_ipc'):
@@ -127,37 +161,54 @@ def find_pareto_frontier(df, cost_col='hardware_cost_proxy', perf_col='predicted
     return sorted_df
 
 
-def plot_pareto_frontier(df, out_path):
+def plot_pareto_frontiers(df, out_path):
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    plt.figure(figsize=(9, 6), dpi=300)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6.5), dpi=300)
     sns.set_theme(style="whitegrid")
     
-    # Non-pareto points
+    # 1. Global Pareto: IPC vs Area/Complexity
     non_pareto = df[~df['is_pareto']]
-    plt.scatter(non_pareto['hardware_cost_proxy'], non_pareto['predicted_ipc'],
-                c="#b0bec5", alpha=0.35, s=25, label="Dominated Design Points")
+    ax1.scatter(non_pareto['hardware_cost_proxy'], non_pareto['predicted_ipc'],
+                c="#b0bec5", alpha=0.25, s=20, label="Dominated Designs")
     
-    # Pareto points
     pareto = df[df['is_pareto']].sort_values(by='hardware_cost_proxy')
-    plt.plot(pareto['hardware_cost_proxy'], pareto['predicted_ipc'],
-             color="#2ca02c", linestyle="-", linewidth=2.5, label="Pareto-Optimal Envelope")
-    plt.scatter(pareto['hardware_cost_proxy'], pareto['predicted_ipc'],
-                c="#d62728", s=60, edgecolors="black", zorder=5, label="Pareto Frontier Configs")
+    ax1.plot(pareto['hardware_cost_proxy'], pareto['predicted_ipc'],
+             color="#2ca02c", linestyle="-", linewidth=2.5, label="Global Pareto Frontier")
+    ax1.scatter(pareto['hardware_cost_proxy'], pareto['predicted_ipc'],
+                c="#d62728", s=55, edgecolors="black", zorder=5, label="Pareto Configs")
     
-    plt.title("Microarchitecture Design Space: Pareto Frontier (IPC vs Silicon Cost Proxy)", fontsize=13, fontweight="bold")
-    plt.xlabel("Estimated Silicon Hardware Cost Proxy (Area/Power Complexity)", fontsize=11)
-    plt.ylabel("Surrogate-Predicted IPC (ARM gem5)", fontsize=11)
-    plt.legend(loc="lower right", frameon=True)
+    ax1.set_title("Global Pareto Frontier (IPC vs Silicon Area Proxy)", fontsize=12, fontweight="bold")
+    ax1.set_xlabel("Silicon Area / Complexity Proxy", fontsize=11)
+    ax1.set_ylabel("Predicted IPC", fontsize=11)
+    ax1.legend(loc="lower right")
+    
+    # 2. Per-Workload Pareto Frontiers
+    workloads = df['workload'].unique()
+    palette = sns.color_palette("tab10", len(workloads))
+    for idx, wl in enumerate(workloads):
+        wl_df = df[df['workload'] == wl].copy()
+        wl_pareto_df = find_pareto_frontier(wl_df, cost_col='hardware_cost_proxy', perf_col='predicted_ipc')
+        wl_pareto = wl_pareto_df[wl_pareto_df['is_pareto']].sort_values(by='hardware_cost_proxy')
+        
+        ax2.plot(wl_pareto['hardware_cost_proxy'], wl_pareto['predicted_ipc'],
+                 linestyle="-", linewidth=2.0, color=palette[idx], label=f"{wl} Frontier")
+        ax2.scatter(wl_pareto['hardware_cost_proxy'], wl_pareto['predicted_ipc'],
+                    color=palette[idx], s=40, edgecolors="black")
+                    
+    ax2.set_title("Per-Workload Domain-Specific Pareto Frontiers", fontsize=12, fontweight="bold")
+    ax2.set_xlabel("Silicon Area / Complexity Proxy", fontsize=11)
+    ax2.set_ylabel("Predicted IPC", fontsize=11)
+    ax2.legend(loc="lower right")
+    
     plt.tight_layout()
     plt.savefig(out_path, dpi=300)
     plt.close()
-    print(f"[INFO] Pareto frontier plot saved to: {out_path}")
+    print(f"[INFO] Multi-objective Pareto frontier plots saved to: {out_path}")
 
 
-def screen_candidates(model_path, num_candidates=5000, top_k=5, output_json="dataset/top5_candidates.json"):
+def screen_candidates(model_path, num_candidates=5000, top_k=5, kappa=1.5, output_json="dataset/top5_candidates.json"):
     if not os.path.exists(model_path):
         print(f"[ERROR] Trained model artifact not found at: {model_path}")
-        print("Please train and export the surrogate model using ml/train_models.py first.")
         sys.exit(1)
         
     print(f"[INFO] Loading surrogate ML pipeline from: {model_path}")
@@ -166,37 +217,43 @@ def screen_candidates(model_path, num_candidates=5000, top_k=5, output_json="dat
     print(f"[INFO] Synthesizing {num_candidates} legal candidate microarchitectural configurations...")
     df_candidates = generate_candidate_design_space(num_candidates=num_candidates)
     
-    print("[INFO] Running millisecond batch surrogate inference...")
+    print("[INFO] Running millisecond batch surrogate inference with epistemic uncertainty estimation...")
     t_start = time.perf_counter()
-    predicted_ipc = pipeline.predict(df_candidates)
+    pred_mean, pred_std = predict_with_uncertainty(pipeline, df_candidates)
     inference_duration_ms = (time.perf_counter() - t_start) * 1000.0
     
-    df_candidates['predicted_ipc'] = predicted_ipc
-    df_candidates['hardware_cost_proxy'] = compute_hardware_cost_proxy(df_candidates)
+    df_candidates['predicted_ipc'] = pred_mean
+    df_candidates['predicted_ipc_std'] = pred_std
+    # Upper Confidence Bound for optimistic exploration under uncertainty: UCB = mu + kappa * sigma
+    df_candidates['ucb_ipc'] = pred_mean + (kappa * pred_std)
+    
+    area_proxy, power_proxy, energy_proxy = compute_cost_and_energy_proxies(df_candidates)
+    df_candidates['hardware_cost_proxy'] = area_proxy
+    df_candidates['power_proxy'] = power_proxy
+    df_candidates['energy_proxy'] = energy_proxy
     
     print(f"[SUCCESS] Evaluated {len(df_candidates)} configurations in {inference_duration_ms:.2f} ms ({inference_duration_ms / len(df_candidates):.4f} ms/config).")
     
-    df_evaluated = find_pareto_frontier(df_candidates)
+    df_evaluated = find_pareto_frontier(df_candidates, cost_col='hardware_cost_proxy', perf_col='predicted_ipc')
     
     # Select Top-K optimal designs on Pareto frontier
     pareto_candidates = df_evaluated[df_evaluated['is_pareto']].copy()
     if len(pareto_candidates) < top_k:
         selected_candidates = df_evaluated.sort_values(by='predicted_ipc', ascending=False).head(top_k)
     else:
-        # Sample evenly across cost spectrum along the pareto front
         indices = np.linspace(0, len(pareto_candidates) - 1, top_k, dtype=int)
         selected_candidates = pareto_candidates.iloc[indices]
         
-    print("\n" + "=" * 110)
+    print("\n" + "=" * 125)
     print(f"      TOP-{top_k} PREDICTED PARETO-OPTIMAL CONFIGURATIONS FOR GEM5 VALIDATION")
-    print("=" * 110)
-    print(f"{'ID':<8} | {'Workload':<10} | {'Width':<6} | {'ROB':<6} | {'L1D (KiB)':<10} | {'L2 (KiB)':<9} | {'Freq':<7} | {'Pred IPC':<10} | {'Cost Proxy':<10}")
-    print("-" * 110)
+    print("=" * 125)
+    print(f"{'ID':<8} | {'Workload':<10} | {'W':<3} | {'ROB':<5} | {'L1D':<5} | {'L2':<5} | {'Freq':<7} | {'Pred IPC':<10} | {'Std (Uncert)':<12} | {'Cost Proxy':<10}")
+    print("-" * 125)
     
     top_candidates_list = []
     for idx, (_, row) in enumerate(selected_candidates.iterrows(), 1):
         cid = f"TOP_{idx:02d}"
-        print(f"{cid:<8} | {row['workload']:<10} | {row['fetch_width']:<6} | {row['rob_entries']:<6} | {row['l1d_size_kb']:<10} | {row['l2_size_kb']:<9} | {row['clk_freq_ghz']:<5.1f}GHz | {row['predicted_ipc']:<10.4f} | {row['hardware_cost_proxy']:<10.2f}")
+        print(f"{cid:<8} | {row['workload']:<10} | {row['fetch_width']:<3} | {row['rob_entries']:<5} | {row['l1d_size_kb']:<5} | {row['l2_size_kb']:<5} | {row['clk_freq_ghz']:<5.1f}GHz | {row['predicted_ipc']:<10.4f} | +/-{row['predicted_ipc_std']:<10.4f} | {row['hardware_cost_proxy']:<10.2f}")
         
         top_candidates_list.append({
             'candidate_id': cid,
@@ -222,18 +279,22 @@ def screen_candidates(model_path, num_candidates=5000, top_k=5, output_json="dat
                 'clk_freq_ghz': float(row['clk_freq_ghz'])
             },
             'predicted_metrics': {
-                'predicted_ipc': float(row['predicted_ipc'])
+                'predicted_ipc': float(row['predicted_ipc']),
+                'uncertainty_std': float(row['predicted_ipc_std']),
+                'ucb_ipc': float(row['ucb_ipc'])
             },
-            'hardware_cost_proxy': float(row['hardware_cost_proxy'])
+            'hardware_cost_proxy': float(row['hardware_cost_proxy']),
+            'power_proxy': float(row['power_proxy']),
+            'energy_proxy': float(row['energy_proxy'])
         })
-    print("=" * 110)
+    print("=" * 125)
     
     os.makedirs(os.path.dirname(output_json), exist_ok=True)
     with open(output_json, 'w') as f:
         json.dump(top_candidates_list, f, indent=2)
     print(f"[SUCCESS] Top-{top_k} candidate specifications saved to: {output_json}")
     
-    plot_pareto_frontier(df_evaluated, "visualizations/pareto_frontier.png")
+    plot_pareto_frontiers(df_evaluated, "visualizations/pareto_frontier.png")
 
 
 if __name__ == '__main__':
@@ -241,7 +302,8 @@ if __name__ == '__main__':
     parser.add_argument("--model", type=str, default="ml/saved_models/best_model_ipc.joblib", help="Path to trained model pipeline")
     parser.add_argument("--candidates", type=int, default=5000, help="Number of virtual candidate designs to evaluate (default: 5000)")
     parser.add_argument("--top-k", type=int, default=5, help="Number of optimal designs to export for validation (default: 5)")
+    parser.add_argument("--kappa", type=float, default=1.5, help="Upper Confidence Bound exploration parameter (default: 1.5)")
     parser.add_argument("--output", type=str, default="dataset/top5_candidates.json", help="Path to export top candidates JSON")
     args = parser.parse_args()
     
-    screen_candidates(args.model, args.candidates, args.top_k, args.output)
+    screen_candidates(args.model, args.candidates, args.top_k, args.kappa, args.output)
