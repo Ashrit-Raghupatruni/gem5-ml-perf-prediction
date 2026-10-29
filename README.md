@@ -47,6 +47,26 @@ Five Pareto-optimal candidate microarchitectures were selected from 5,000 screen
 
 ---
 
+## 🤖 Machine Learning Model Architectures
+
+The framework evaluates three distinct families of machine learning algorithms in [`ml/train_models.py`](ml/train_models.py) to identify the optimal surrogate for microarchitectural performance prediction:
+
+1. **K-Nearest Neighbors Regressor (`KNN`)**
+   - **Configuration**: $k=5$ neighbors with distance-weighted inverse Euclidean interpolation (`weights='distance'`).
+   - **Role**: Non-parametric baseline capturing local neighborhood microarchitectural similarities in continuous-categorical feature space without enforcing linear assumptions.
+2. **Random Forest Regressor (`RandomForest`) — Champion Model**
+   - **Configuration**: 200 estimators, maximum tree depth 12, parallel multi-threaded fitting (`n_jobs=-1`).
+   - **Role**: Non-linear ensemble model capturing complex inter-parameter feature interactions (e.g., pipeline width vs. issue queue sizing vs. clock frequency). Provides variance-based epistemic uncertainty ($\sigma$) across individual decision trees, used for Upper Confidence Bound (UCB) screening and Active Learning.
+3. **Histogram-Based Gradient Boosting (`HistGradientBoosting`)**
+   - **Configuration**: 250 iterations, learning rate 0.08, minimum samples per leaf 5.
+   - **Role**: Gradient-boosted decision tree ensemble using binned integer features for fast training and competitive predictive fidelity.
+
+All models are trained through a scikit-learn `Pipeline` incorporating a `ColumnTransformer` that applies:
+- `OneHotEncoder(drop='first', handle_unknown='ignore')` for categorical features (`workload`, `branch_predictor`).
+- `StandardScaler()` for continuous/discrete microarchitectural parameters (fetch/decode/issue/commit widths, buffer sizes, cache capacities, clock frequency).
+
+---
+
 ## 📂 Repository Structure
 
 ```
