@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Parallel Shard/Master gem5 Sweep Execution Runner
+Parallel Shard/Master gem5 Sweep Execution Runner with Environment Provenance
 Project: ML-Based Microarchitectural Performance Prediction (ARM gem5)
 Strictly adheres to: documents/security.md, documents/user_flow.md, Plan 1
 """
@@ -10,9 +10,63 @@ import sys
 import json
 import time
 import re
+import socket
+import platform
+import hashlib
 import argparse
 import subprocess
 from multiprocessing import Pool
+
+
+def collect_environment_metadata(gem5_bin):
+    """
+    Collects rich host, git, and gem5 binary provenance metadata for cross-machine reproducibility.
+    """
+    metadata = {
+        'hostname': socket.gethostname(),
+        'platform': platform.platform(),
+        'processor': platform.processor() or "Unknown",
+        'cpu_count': os.cpu_count(),
+        'python_version': platform.python_version(),
+        'timestamp_utc': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()),
+        'gem5_binary': gem5_bin,
+        'gem5_binary_sha256': None,
+        'gem5_version': None,
+        'git_commit': None,
+        'git_dirty': False
+    }
+    
+    # Compute gem5 binary SHA-256
+    if os.path.exists(gem5_bin):
+        try:
+            h = hashlib.sha256()
+            with open(gem5_bin, 'rb') as f:
+                while chunk := f.read(65536):
+                    h.update(chunk)
+            metadata['gem5_binary_sha256'] = h.hexdigest()
+        except Exception:
+            pass
+            
+        # Get gem5 version
+        try:
+            res = subprocess.run([gem5_bin, "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10)
+            if res.returncode == 0:
+                metadata['gem5_version'] = res.stdout.strip()
+        except Exception:
+            pass
+
+    # Git metadata
+    try:
+        res = subprocess.run(["git", "rev-parse", "HEAD"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5)
+        if res.returncode == 0:
+            metadata['git_commit'] = res.stdout.strip()
+        status_res = subprocess.run(["git", "status", "--porcelain"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5)
+        if status_res.returncode == 0:
+            metadata['git_dirty'] = len(status_res.stdout.strip()) > 0
+    except Exception:
+        pass
+
+    return metadata
 
 
 def verify_simulation_output(run_out_dir):
@@ -55,7 +109,6 @@ def run_single_simulation(task_args):
     
     bench_bin = os.path.join(benchmarks_dir, f"{wl}-arm")
     
-    # Retrieve discrete widths or fallback to fetch_width
     fetch_w = cfg.get('fetch_width', 4)
     decode_w = cfg.get('decode_width', fetch_w)
     issue_w = cfg.get('issue_width', fetch_w)
@@ -97,7 +150,6 @@ def run_single_simulation(task_args):
             status = f"FAILED (Exit code {proc.returncode})"
             details = f"Process exit code: {proc.returncode}"
         else:
-            # Rigorous check on outputs
             is_valid, reason = verify_simulation_output(run_out_dir)
             if not is_valid:
                 status = f"FAILED ({reason})"
@@ -135,6 +187,8 @@ def execute_parallel_sweep(shard_json, gem5_bin, script_path, benchmarks_dir, ou
     print(f"   Outputs Dir   : {out_dir}")
     print("=" * 110)
     
+    env_metadata = collect_environment_metadata(gem5_bin)
+    
     os.makedirs(out_dir, exist_ok=True)
     tasks = [(cfg, gem5_bin, script_path, benchmarks_dir, out_dir, timeout) for cfg in configs]
     
@@ -146,23 +200,28 @@ def execute_parallel_sweep(shard_json, gem5_bin, script_path, benchmarks_dir, ou
     total_cpu_seconds = sum(r['duration_sec'] for r in results)
     success_count = sum(1 for r in results if r['status'] == "SUCCESS")
     
+    # Calculate measured empirical parallel efficiency
+    parallel_efficiency = (total_cpu_seconds / (total_wall_clock * workers)) if (total_wall_clock * workers) > 0 else 1.0
+    
     manifest = {
+        'environment_provenance': env_metadata,
         'shard_file': shard_json,
         'total_configs': len(configs),
         'success_count': success_count,
         'failed_count': len(configs) - success_count,
         'workers': workers,
-        'total_wall_clock_sec': total_wall_clock,
-        'total_cpu_seconds': total_cpu_seconds,
+        'measured_wall_clock_sec': total_wall_clock,
+        'measured_cpu_seconds': total_cpu_seconds,
+        'empirical_parallel_efficiency': float(min(1.0, parallel_efficiency)),
         'simulations': results
     }
     manifest_path = os.path.join(out_dir, "simulation_manifest.json")
     with open(manifest_path, 'w') as f:
         json.dump(manifest, f, indent=2)
-    print(f"[INFO] Saved run manifest: {manifest_path}")
+    print(f"[INFO] Saved run manifest with provenance metadata: {manifest_path}")
     
     print("=" * 110)
-    print(f"   SWEEP FINISHED: {success_count}/{len(configs)} Succeeded in {total_wall_clock / 60.0:.2f} Minutes (Wall-clock) | Aggregate CPU: {total_cpu_seconds / 60.0:.2f} Core-Minutes")
+    print(f"   SWEEP FINISHED: {success_count}/{len(configs)} Succeeded in {total_wall_clock / 60.0:.2f} Minutes (Wall-clock) | Aggregate CPU: {total_cpu_seconds / 60.0:.2f} Core-Minutes | Parallel Efficiency: {parallel_efficiency*100.0:.1f}%")
     print("=" * 110)
 
 

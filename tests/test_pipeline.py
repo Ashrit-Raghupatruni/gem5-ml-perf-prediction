@@ -13,13 +13,15 @@ import numpy as np
 import pandas as pd
 
 from scripts.generate_design_space import generate_lhs_design_space, save_and_split_shards
-from scripts.parse_dataset import parse_single_stats, harvest_dataset
+from scripts.parse_dataset import parse_single_stats, audit_simulation_manifests
 from ml.predict_and_screen import generate_candidate_design_space, compute_cost_and_energy_proxies, find_pareto_frontier
+from ml.train_models import build_preprocessor, get_model_candidates, get_feature_definitions
+from sklearn.pipeline import Pipeline
 
 
 class TestDesignSpaceGenerator(unittest.TestCase):
     def test_sample_counts_and_shards(self):
-        configs = generate_lhs_design_space(num_samples=40, seed=42)
+        configs = generate_lhs_design_space(num_samples=40, seed=42, independent_widths=True)
         self.assertEqual(len(configs), 40)
         
         # Check workload balance
@@ -29,22 +31,31 @@ class TestDesignSpaceGenerator(unittest.TestCase):
         self.assertEqual(wls.count('quicksort'), 10)
         self.assertEqual(wls.count('hash'), 10)
         
-        # Test sharding with remainder
+        # Verify microarchitectural monotonic constraint legality
+        for c in configs:
+            self.assertGreaterEqual(c['fetch_width'], c['decode_width'])
+            self.assertGreaterEqual(c['decode_width'], c['issue_width'])
+            self.assertGreaterEqual(c['commit_width'], c['issue_width'])
+            self.assertGreaterEqual(c['rob_entries'], c['iq_entries'])
+        
         with tempfile.TemporaryDirectory() as tmp_dir:
             save_and_split_shards(configs, tmp_dir, num_shards=3)
             master_file = os.path.join(tmp_dir, "sweep_configs.json")
             self.assertTrue(os.path.exists(master_file))
             
-            s1 = json.load(open(os.path.join(tmp_dir, "shards", "shard_1.json")))
-            s2 = json.load(open(os.path.join(tmp_dir, "shards", "shard_2.json")))
-            s3 = json.load(open(os.path.join(tmp_dir, "shards", "shard_3.json")))
+            with open(os.path.join(tmp_dir, "shards", "shard_1.json")) as f1:
+                s1 = json.load(f1)
+            with open(os.path.join(tmp_dir, "shards", "shard_2.json")) as f2:
+                s2 = json.load(f2)
+            with open(os.path.join(tmp_dir, "shards", "shard_3.json")) as f3:
+                s3 = json.load(f3)
             self.assertEqual(len(s1) + len(s2) + len(s3), 40)
             self.assertEqual(len(s1), 14)
             self.assertEqual(len(s2), 13)
             self.assertEqual(len(s3), 13)
 
 
-class TestStatsParser(unittest.TestCase):
+class TestStatsParserAndProvenance(unittest.TestCase):
     def test_parse_valid_stats(self):
         with tempfile.NamedTemporaryFile('w', delete=False) as f:
             f.write("simInsts  1000000\n")
@@ -78,13 +89,27 @@ class TestStatsParser(unittest.TestCase):
             if os.path.exists(f.name_path):
                 os.remove(f.name_path)
 
+    def test_provenance_audit(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            m1 = {
+                'environment_provenance': {
+                    'hostname': 'host1',
+                    'gem5_binary_sha256': 'abcdef123456',
+                    'git_commit': 'deadbeef'
+                }
+            }
+            with open(os.path.join(tmp_dir, "simulation_manifest.json"), "w") as f:
+                json.dump(m1, f)
+            audit = audit_simulation_manifests([tmp_dir])
+            self.assertEqual(audit['total_manifests_found'], 1)
+            self.assertTrue(audit['is_gem5_build_homogeneous'])
+
 
 class TestCandidateScreeningAndPareto(unittest.TestCase):
     def test_candidate_generation_and_pareto(self):
         df_candidates = generate_candidate_design_space(num_candidates=100)
         self.assertEqual(len(df_candidates), 100)
         
-        # Fake predicted IPC
         df_candidates['predicted_ipc'] = np.random.uniform(0.5, 2.0, size=len(df_candidates))
         area, power, energy = compute_cost_and_energy_proxies(df_candidates)
         df_candidates['hardware_cost_proxy'] = area
@@ -92,6 +117,52 @@ class TestCandidateScreeningAndPareto(unittest.TestCase):
         pareto_df = find_pareto_frontier(df_candidates, cost_col='hardware_cost_proxy', perf_col='predicted_ipc')
         self.assertIn('is_pareto', pareto_df.columns)
         self.assertTrue(pareto_df['is_pareto'].sum() > 0)
+
+
+class TestSyntheticPipelineIntegration(unittest.TestCase):
+    def test_synthetic_train_and_screen(self):
+        """
+        Tests model pipeline training and screening with synthetic microarchitectural data.
+        """
+        cat_cols, num_cols = get_feature_definitions()
+        all_features = cat_cols + num_cols
+        
+        n_samples = 40
+        np.random.seed(42)
+        synthetic_data = {
+            'workload': np.random.choice(['matmul', 'stream', 'quicksort', 'hash'], n_samples),
+            'branch_predictor': np.random.choice(['TournamentBP', 'BiModeBP', 'LocalBP'], n_samples),
+            'fetch_width': np.random.choice([2, 4, 8], n_samples),
+            'decode_width': np.random.choice([2, 4, 8], n_samples),
+            'issue_width': np.random.choice([2, 4, 8], n_samples),
+            'commit_width': np.random.choice([2, 4, 8], n_samples),
+            'rob_entries': np.random.choice([64, 96, 128, 192], n_samples),
+            'iq_entries': np.random.choice([32, 48, 64], n_samples),
+            'lq_entries': np.random.choice([16, 24, 32], n_samples),
+            'sq_entries': np.random.choice([16, 24, 32], n_samples),
+            'phys_int_regs': np.random.choice([128, 160, 192], n_samples),
+            'phys_fp_regs': np.random.choice([128, 160, 192], n_samples),
+            'l1d_size_kb': np.random.choice([16, 32, 64], n_samples),
+            'l1d_assoc': np.random.choice([2, 4, 8], n_samples),
+            'l1i_size_kb': np.random.choice([16, 32], n_samples),
+            'l1i_assoc': np.random.choice([2, 4], n_samples),
+            'l2_size_kb': np.random.choice([256, 512], n_samples),
+            'l2_assoc': np.random.choice([4, 8], n_samples),
+            'clk_freq_ghz': np.random.choice([1.5, 2.0, 3.0], n_samples),
+            'ipc': np.random.uniform(0.5, 3.0, n_samples)
+        }
+        df_syn = pd.DataFrame(synthetic_data)
+        
+        preprocessor = build_preprocessor()
+        pipeline = Pipeline([
+            ('preprocessor', preprocessor),
+            ('regressor', get_model_candidates()['RandomForest'])
+        ])
+        pipeline.fit(df_syn[all_features], df_syn['ipc'])
+        
+        preds = pipeline.predict(df_syn[all_features])
+        self.assertEqual(len(preds), n_samples)
+        self.assertTrue((preds > 0).all())
 
 
 if __name__ == '__main__':

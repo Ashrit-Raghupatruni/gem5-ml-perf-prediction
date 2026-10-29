@@ -1,0 +1,27 @@
+{
+  "total_runs_scanned": 180,
+  "valid_runs_harvested": 129,
+  "duplicates_removed": 0,
+  "missing_stats_count": 0,
+  "invalid_stats_count": 51,
+  "rejection_breakdown": {
+    "stats.txt missing or empty": 51
+  },
+  "workload_distribution": {
+    "hash": 33,
+    "quicksort": 33,
+    "stream": 32,
+    "matmul": 31
+  },
+  "feature_summary": {
+    "ipc_min": 0.381184,
+    "ipc_max": 4.1492,
+    "ipc_mean": 1.4225990000000002,
+    "ipc_std": 0.8006746360494225,
+    "cycles_min": 255570,
+    "cycles_max": 3039622,
+    "sim_insts_min": 865654,
+    "sim_insts_max": 2802108
+  },
+  "sha256": "90cf50565d94a3c1f0e44a7b3f4d021b3857987ce4251df46d61dd4a0ec874c6"
+}

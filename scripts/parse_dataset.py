@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-gem5 Stats Harvester & Dataset Unifier with Quality Verification
+gem5 Stats Harvester, Dataset Unifier & Multi-Machine Integrity Validator
 Project: ML-Based Microarchitectural Performance Prediction (ARM gem5)
 Strictly adheres to: documents/schema.md, documents/security.md
 """
@@ -40,7 +40,6 @@ def parse_single_stats(stats_file):
             if len(parts) >= 2:
                 stats[parts[0]] = parts[1]
                 
-    # Strict validation of mandatory counters
     if 'simInsts' not in stats:
         return None, "simInsts metric missing"
     if 'board.processor.cores.core.numCycles' not in stats:
@@ -56,7 +55,6 @@ def parse_single_stats(stats_file):
     if sim_insts <= 0 or num_cycles <= 0:
         return None, f"Non-positive instructions ({sim_insts}) or cycles ({num_cycles})"
         
-    # IPC calculation
     if 'board.processor.cores.core.ipc' in stats:
         try:
             ipc = float(stats['board.processor.cores.core.ipc'])
@@ -67,7 +65,6 @@ def parse_single_stats(stats_file):
         
     cpi = 1.0 / ipc if ipc > 0 else 0.0
     
-    # Cache and branch statistics (with safe lookup)
     l1d_raw = (stats.get('board.cache_hierarchy.l2_node.l1d-cache-0.cache.overallMisses::total') or
                stats.get('board.cache_hierarchy.l1d-cache-0.cache.overallMisses::total') or
                stats.get('board.processor.cores.core.dcache.overallMisses::total') or '0')
@@ -108,6 +105,44 @@ def parse_single_stats(stats_file):
         'dram_total_reqs': dram_total_reqs
     }
     return parsed, "OK"
+
+
+def audit_simulation_manifests(output_dirs):
+    """
+    Checks manifest provenance across shard outputs to verify cross-machine reproducibility
+    and detect gem5 build / commit mismatches.
+    """
+    manifests = []
+    gem5_hashes = set()
+    git_commits = set()
+    hosts = set()
+    
+    for base_dir in output_dirs:
+        m_files = glob.glob(os.path.join(base_dir, "simulation_manifest.json")) + glob.glob(os.path.join(base_dir, "*", "simulation_manifest.json"))
+        for mf in m_files:
+            try:
+                with open(mf, 'r') as f:
+                    m = json.load(f)
+                    manifests.append(m)
+                    provenance = m.get('environment_provenance', {})
+                    if provenance.get('gem5_binary_sha256'):
+                        gem5_hashes.add(provenance['gem5_binary_sha256'])
+                    if provenance.get('git_commit'):
+                        git_commits.add(provenance['git_commit'])
+                    if provenance.get('hostname'):
+                        hosts.add(provenance['hostname'])
+            except Exception:
+                pass
+                
+    provenance_audit = {
+        'total_manifests_found': len(manifests),
+        'distinct_hosts': list(hosts),
+        'distinct_gem5_hashes': list(gem5_hashes),
+        'distinct_git_commits': list(git_commits),
+        'is_gem5_build_homogeneous': len(gem5_hashes) <= 1,
+        'is_git_commit_homogeneous': len(git_commits) <= 1
+    }
+    return provenance_audit
 
 
 def harvest_dataset(configs_json, output_dirs, out_csv, quality_report_path=None):
@@ -166,7 +201,7 @@ def harvest_dataset(configs_json, output_dirs, out_csv, quality_report_path=None
         
     df = pd.DataFrame(rows)
     
-    # Check duplicates
+    # Check duplicates and retain the most recent verified run
     raw_count = len(df)
     df = df.drop_duplicates(subset=['config_id', 'workload'], keep='last')
     duplicates_removed = raw_count - len(df)
@@ -183,7 +218,9 @@ def harvest_dataset(configs_json, output_dirs, out_csv, quality_report_path=None
         f.write(f"{checksum}  {os.path.basename(out_csv)}\n")
     print(f"[SUCCESS] Generated integrity manifest: {sha_path}")
     
-    # Generate Quality Report
+    # Multi-machine provenance audit
+    provenance_audit = audit_simulation_manifests(output_dirs)
+    
     if quality_report_path is None:
         quality_report_path = os.path.join(os.path.dirname(out_csv), "dataset_quality_report.json")
         
@@ -194,6 +231,7 @@ def harvest_dataset(configs_json, output_dirs, out_csv, quality_report_path=None
         'missing_stats_count': missing_stats,
         'invalid_stats_count': invalid_stats,
         'rejection_breakdown': rejection_reasons,
+        'provenance_audit': provenance_audit,
         'workload_distribution': df['workload'].value_counts().to_dict(),
         'feature_summary': {
             'ipc_min': float(df['ipc'].min()),
@@ -209,7 +247,7 @@ def harvest_dataset(configs_json, output_dirs, out_csv, quality_report_path=None
     }
     with open(quality_report_path, 'w') as f:
         json.dump(report, f, indent=2)
-    print(f"[SUCCESS] Quality report generated: {quality_report_path}")
+    print(f"[SUCCESS] Quality report with provenance audit generated: {quality_report_path}")
 
 
 if __name__ == '__main__':

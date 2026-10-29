@@ -1,0 +1,57 @@
+{
+  "mean_validation_error_pct": 5.445671655454734,
+  "per_sim_measured_cpu_sec": 7.653424491883329,
+  "exhaustive_serial_cpu_hours": 10.629756238726845,
+  "exhaustive_parallel_wall_hours": 2.6574390596817112,
+  "ml_guided_wall_hours": 0.11688319161027803,
+  "ml_guided_cpu_hours": 0.3967756377794444,
+  "host_wall_clock_speedup": 22.73585297484323,
+  "aggregate_core_hour_speedup": 26.790345037856394,
+  "validation_details": [
+    {
+      "candidate_id": "TOP_01",
+      "workload": "matmul",
+      "predicted_ipc": 1.460658829999997,
+      "simulated_ipc": 1.413325,
+      "absolute_error": 0.047333829999997024,
+      "percentage_error": 3.3491114924024568,
+      "sim_wallclock_sec": 7.738741810000192
+    },
+    {
+      "candidate_id": "TOP_02",
+      "workload": "matmul",
+      "predicted_ipc": 2.412229215000002,
+      "simulated_ipc": 2.269244,
+      "absolute_error": 0.14298521500000216,
+      "percentage_error": 6.301006634808869,
+      "sim_wallclock_sec": 6.746893983000064
+    },
+    {
+      "candidate_id": "TOP_03",
+      "workload": "matmul",
+      "predicted_ipc": 3.0722016849999982,
+      "simulated_ipc": 3.060915,
+      "absolute_error": 0.011286684999998187,
+      "percentage_error": 0.368735655841413,
+      "sim_wallclock_sec": 7.394719738000276
+    },
+    {
+      "candidate_id": "TOP_04",
+      "workload": "matmul",
+      "predicted_ipc": 3.793288444999996,
+      "simulated_ipc": 3.337438,
+      "absolute_error": 0.45585044499999583,
+      "percentage_error": 13.658694034166203,
+      "sim_wallclock_sec": 7.354847436
+    },
+    {
+      "candidate_id": "TOP_05",
+      "workload": "matmul",
+      "predicted_ipc": 3.998286685,
+      "simulated_ipc": 4.145485,
+      "absolute_error": 0.1471983149999998,
+      "percentage_error": 3.5508104600547297,
+      "sim_wallclock_sec": 6.540684500000225
+    }
+  ]
+}
