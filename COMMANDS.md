@@ -20,6 +20,16 @@ pip install -r requirements.txt --break-system-packages
 
 ---
 
+## 🧪 Step 0: Run Unit Tests & Sanity Check
+
+Runs the automated unit test suite verifying design space generation, remainder distribution, stats parsing, and candidate screening:
+
+```bash
+python3 -m unittest discover tests -v
+```
+
+---
+
 ## 🚀 Step-by-Step Manual Workflow
 
 ### Step 1: Compile the ARM64 Benchmark Binaries
@@ -42,7 +52,7 @@ file benchmarks/*-arm
 Generates 180 Latin Hypercube Sampled configurations and splits them into 3 shards for team distribution:
 
 ```bash
-python3 scripts/generate_design_space.py --samples 180 --shards 3 --output-dir configs
+python3 scripts/generate_design_space.py --samples 180 --shards 3 --seed 42 --output-dir configs
 ```
 
 Outputs created:
@@ -80,11 +90,13 @@ python3 scripts/run_parallel_sweep.py \
 *(On Laptop 2 for Member B: substitute `--shard configs/shards/shard_2.json --out-dir outputs/shard_2`)*  
 *(On Laptop 3 for Member C: substitute `--shard configs/shards/shard_3.json --out-dir outputs/shard_3`)*
 
+*Note: The runner validates that `stats.txt` exists and `simInsts > 0` before declaring success, and records wall-clock and aggregate core times into `simulation_manifest.json`.*
+
 ---
 
 ### Step 4: Harvest Stats & Build the Clean Dataset
 
-Extracts cycle-accurate counters (`simInsts`, `ipc`, `l1d_mpki`, `l2_mpki`, `branch_mispred_rate`, `dram_total_reqs`) into a structured CSV file:
+Extracts cycle-accurate counters (`simInsts`, `ipc`, `l1d_mpki`, `l2_mpki`, `branch_mispred_rate`, `dram_total_reqs`) into a structured CSV file with strict validation and generates a quality report:
 
 #### If you ran all 180 on one machine:
 ```bash
@@ -103,6 +115,11 @@ python3 scripts/parse_dataset.py \
   --output dataset/dataset_cleaned.csv
 ```
 
+Outputs created:
+- `dataset/dataset_cleaned.csv`
+- `dataset/dataset_cleaned.csv.sha256` (Integrity checksum)
+- `dataset/dataset_quality_report.json` (Rejection and counter summary)
+
 *Verification check:*
 ```bash
 head -n 5 dataset/dataset_cleaned.csv
@@ -111,9 +128,9 @@ wc -l dataset/dataset_cleaned.csv
 
 ---
 
-### Step 5: Train & Cross-Validate Machine Learning Models
+### Step 5: Train, Cross-Validate & Evaluate Models
 
-Trains Ridge, Random Forest, and HistGradientBoosting regressors under 5-Fold Cross-Validation, selects the champion model, and generates evaluation plots:
+Partitions data into 80% train and 20% untouched test split (stratified by workload). Performs 5-Fold Cross-Validation on the training partition, Leave-One-Workload-Out validation, computes 95% bootstrap confidence intervals, and permutation importance on the test set:
 
 ```bash
 python3 ml/train_models.py \
@@ -123,22 +140,25 @@ python3 ml/train_models.py \
 ```
 
 Outputs created:
-- `ml/saved_models/best_model_ipc.joblib`
-- `ml/saved_models/model_metadata.json`
-- `visualizations/feature_importance.png`
-- `visualizations/predicted_vs_actual.png`
+- `ml/saved_models/best_model_ipc.joblib` (Trained pipeline)
+- `ml/saved_models/model_metadata.json` (Full metrics, 95% CIs, workload generalization)
+- `ml/saved_models/oof_predictions.csv` (Out-of-fold cross-validation predictions)
+- `ml/saved_models/test_predictions.csv` (Held-out test set predictions)
+- `visualizations/feature_importance.png` (Permutation importance on test set)
+- `visualizations/predicted_vs_actual.png` (Predicted vs actual scatter on test set)
 
 ---
 
-### Step 6: Screen 5,000 Candidates & Find Pareto-Optimal Designs
+### Step 6: Screen 5,000 Candidates & Multi-Objective Pareto Optimization
 
-Evaluates 5,000 virtual candidate designs in $<100\text{ ms}$, calculates the hardware complexity proxy score, maps the Pareto frontier, and exports the Top-5 designs:
+Evaluates 5,000 virtual candidate designs in milliseconds, calculates epistemic uncertainty across trees ($\sigma$), Upper Confidence Bound ($\text{UCB} = \mu + 1.5\sigma$), Area/Power/Energy proxies, maps global and per-workload Pareto frontiers, and exports top candidates:
 
 ```bash
 python3 ml/predict_and_screen.py \
   --model ml/saved_models/best_model_ipc.joblib \
   --candidates 5000 \
   --top-k 5 \
+  --kappa 1.5 \
   --output dataset/top5_candidates.json
 ```
 
@@ -148,9 +168,27 @@ Outputs created:
 
 ---
 
-### Step 7: Ground-Truth gem5 Validation & Speedup Proof
+### Step 7 (Optional / Advanced): Active Learning Query Selection
 
-Simulates the Top-5 predicted microarchitectures in cycle-accurate gem5, verifies prediction accuracy ($\le 7\%$ error), and quantifies overall simulation speedup ($\ge 25\times$):
+Identifies the top informative candidate configurations with highest predictive uncertainty from an unlabeled candidate pool:
+
+```bash
+python3 ml/active_learning.py \
+  --model ml/saved_models/best_model_ipc.joblib \
+  --pool-size 2000 \
+  --queries 15 \
+  --strategy uncertainty \
+  --output configs/active_queries.json
+```
+
+Outputs created:
+- `configs/active_queries.json`
+
+---
+
+### Step 8: Ground-Truth gem5 Validation & Speedup Proof
+
+Simulates the Top-5 predicted microarchitectures in cycle-accurate gem5, verifies prediction error ($\le 7\%$), and quantifies defensible host wall-clock speedup and aggregate core-hour reduction:
 
 ```bash
 python3 ml/validate_and_evaluate.py \
@@ -158,11 +196,13 @@ python3 ml/validate_and_evaluate.py \
   --gem5 /home/ashrit/gem5/build/ARM/gem5.opt \
   --script configs/arm_o3_parametric.py \
   --benchmarks benchmarks \
-  --output dataset/validation_results.csv
+  --output dataset/validation_results.csv \
+  --inputs outputs
 ```
 
 Outputs created:
 - `dataset/validation_results.csv`
+- `dataset/validation_summary.json`
 - `visualizations/speedup_comparison.png`
 
 ---
@@ -178,5 +218,5 @@ cp -r ml/saved_models/* /mnt/c/Users/ashri/Documents/antigravity/dazzling-pythag
 
 ### Clean All Generated Simulation Outputs (Reset):
 ```bash
-rm -rf outputs/* dataset/* visualizations/* ml/saved_models/* benchmarks/*-arm
+rm -rf outputs/* dataset/* visualizations/* ml/saved_models/* benchmarks/*-arm configs/active_queries.json
 ```
