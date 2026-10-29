@@ -95,6 +95,7 @@ def load_actual_doe_manifest_times(outputs_dirs):
     """
     Scrapes measured simulation_manifest.json files to compute actual measured wall-clock,
     cumulative CPU time, and empirical parallel scaling efficiency.
+    Returns None if no valid manifests are found.
     """
     total_doe_cpu_sec = 0.0
     total_doe_wall_sec = 0.0
@@ -118,74 +119,85 @@ def load_actual_doe_manifest_times(outputs_dirs):
             except Exception:
                 pass
                 
+    if sim_count == 0 or total_doe_cpu_sec == 0.0:
+        return None
+        
     avg_workers = int(np.mean(workers_list)) if workers_list else 4
     empirical_parallel_eff = float(np.mean(parallel_eff_list)) if parallel_eff_list else 0.85
-    return total_doe_wall_sec, total_doe_cpu_sec, sim_count, avg_workers, empirical_parallel_eff
+    return {
+        'total_doe_wall_sec': total_doe_wall_sec,
+        'total_doe_cpu_sec': total_doe_cpu_sec,
+        'sim_count': sim_count,
+        'avg_workers': avg_workers,
+        'empirical_parallel_eff': empirical_parallel_eff
+    }
 
 
-def compute_hypervolume_2d(points, ref_point):
+def evaluate_optimizer_performance(df_val, dataset_cleaned_path, percentile_threshold=0.90):
     """
-    Computes 2D hypervolume dominated by points with respect to ref_point.
-    Points are (cost, -perf) where we minimize both.
-    """
-    sorted_pts = sorted(points, key=lambda p: p[0])
-    hv = 0.0
-    cur_y = ref_point[1]
-    for x, y in sorted_pts:
-        if x < ref_point[0] and y < cur_y:
-            hv += (ref_point[0] - x) * (cur_y - y)
-            cur_y = y
-    return max(0.0, hv)
-
-
-def evaluate_optimizer_performance(df_val, dataset_cleaned_path):
-    """
-    Evaluates empirical optimizer quality:
+    Evaluates empirical optimizer quality against a reference dataset:
     1. Simple Regret against best known simulated candidate in dataset
-    2. Top-K Hit Rate (% of top recommended designs that are >= 90th percentile simulated IPC)
+    2. Top-K Hit Rate (% of top recommended designs that meet or exceed percentile_threshold, default 90th percentile)
+    
+    Fails clearly or returns explicit 'UNAVAILABLE' status if dataset is missing or insufficient.
     """
     if not os.path.exists(dataset_cleaned_path):
         return {
-            'simple_regret': 0.0,
-            'top_k_hit_rate_pct': 100.0,
-            'best_simulated_ipc': float(df_val['simulated_ipc'].max()),
-            'recommended_simulated_ipc': float(df_val['simulated_ipc'].iloc[0])
+            'status': 'UNAVAILABLE (Reference dataset not found at ' + dataset_cleaned_path + ')',
+            'simple_regret': None,
+            'top_k_hit_rate_pct': None,
+            'percentile_threshold': percentile_threshold,
+            'best_known_dataset_ipc': None,
+            'best_validated_candidate_ipc': float(df_val['simulated_ipc'].max()) if not df_val.empty else None
         }
         
     df_all = pd.read_csv(dataset_cleaned_path)
-    # Global maximum IPC found across all ground-truth simulations
-    best_known_sim_ipc = df_all['ipc'].max()
-    threshold_90th = df_all['ipc'].quantile(0.85)
+    if 'ipc' not in df_all.columns or len(df_all) < 10:
+        return {
+            'status': 'UNAVAILABLE (Insufficient reference samples in dataset)',
+            'simple_regret': None,
+            'top_k_hit_rate_pct': None,
+            'percentile_threshold': percentile_threshold,
+            'best_known_dataset_ipc': None,
+            'best_validated_candidate_ipc': float(df_val['simulated_ipc'].max()) if not df_val.empty else None
+        }
+        
+    best_known_sim_ipc = float(df_all['ipc'].max())
+    threshold_val = float(df_all['ipc'].quantile(percentile_threshold))
     
-    top_recommended_sim_ipc = df_val['simulated_ipc'].max()
+    top_recommended_sim_ipc = float(df_val['simulated_ipc'].max())
     simple_regret = max(0.0, best_known_sim_ipc - top_recommended_sim_ipc)
     
-    hits = (df_val['simulated_ipc'] >= threshold_90th).sum()
+    hits = (df_val['simulated_ipc'] >= threshold_val).sum()
     hit_rate = (hits / len(df_val)) * 100.0
     
     return {
-        'best_known_dataset_ipc': float(best_known_sim_ipc),
-        'best_validated_candidate_ipc': float(top_recommended_sim_ipc),
+        'status': 'EVALUATED',
+        'best_known_dataset_ipc': best_known_sim_ipc,
+        'best_validated_candidate_ipc': top_recommended_sim_ipc,
         'simple_regret': float(simple_regret),
-        'percentile_threshold_85th': float(threshold_90th),
+        'percentile_used': percentile_threshold,
+        'percentile_threshold_ipc': threshold_val,
         'top_k_hit_rate_pct': float(hit_rate)
     }
 
 
 def plot_speedup_comparison(extrapolated_serial_cpu_hours, extrapolated_parallel_wall_hours,
                             measured_ml_guided_wall_hours, measured_ml_cpu_hours,
-                            speedup_wall, speedup_cpu, out_path):
+                            speedup_wall, speedup_cpu, out_path, is_extrapolated=True):
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.5), dpi=300)
     sns.set_theme(style="whitegrid")
     
-    categories_wall = ['Exhaustive gem5\n(Extrapolated Parallel / 4W)', 'ML-Guided Exploration\n(Measured Host Wall-Clock)']
+    title_suffix = " (Extrapolated)" if is_extrapolated else " (Directly Measured)"
+    
+    categories_wall = ['Exhaustive gem5' + title_suffix, 'ML-Guided Exploration\n(Measured Wall-Clock)']
     runtimes_wall = [extrapolated_parallel_wall_hours, measured_ml_guided_wall_hours]
     colors_wall = ['#e53935', '#1e88e5']
     
     bars1 = ax1.bar(categories_wall, runtimes_wall, color=colors_wall, width=0.45, edgecolor='black', linewidth=1.2)
     ax1.set_ylabel("Host Wall-Clock Time (Hours)", fontsize=11, fontweight="bold")
-    ax1.set_title(f"Host Wall-Clock Speedup: {speedup_wall:.1f}x\n(Includes Measured Worker Efficiency)", fontsize=11, fontweight="bold")
+    ax1.set_title(f"Host Wall-Clock Speedup: {speedup_wall:.1f}x\n(Measured Multiprocess Worker Scaling)", fontsize=11, fontweight="bold")
     
     for bar, val in zip(bars1, runtimes_wall):
         y_pos = bar.get_height()
@@ -193,7 +205,7 @@ def plot_speedup_comparison(extrapolated_serial_cpu_hours, extrapolated_parallel
         ax1.text(bar.get_x() + bar.get_width() / 2.0, y_pos * 1.02, text, ha='center', va='bottom', fontsize=10, fontweight='bold')
     ax1.set_ylim(0, max(runtimes_wall) * 1.25)
     
-    categories_cpu = ['Exhaustive gem5\n(Extrapolated Core-Hours)', 'ML-Guided Exploration\n(Measured Core-Hours)']
+    categories_cpu = ['Exhaustive gem5' + title_suffix, 'ML-Guided Exploration\n(Measured Core-Hours)']
     runtimes_cpu = [extrapolated_serial_cpu_hours, measured_ml_cpu_hours]
     colors_cpu = ['#d32f2f', '#1976d2']
     
@@ -280,69 +292,94 @@ def validate_candidates(candidates_json, gem5_bin, script_path, benchmarks_dir, 
     mean_val_error = df_val['percentage_error'].mean()
     val_avg_time = df_val['sim_wallclock_sec'].mean()
     
-    # Measured DoE times and empirical scaling efficiency from manifests
-    doe_wall_sec, doe_cpu_sec, sim_count, avg_workers, parallel_eff = load_actual_doe_manifest_times(outputs_dirs)
-    if doe_cpu_sec == 0.0 or sim_count == 0:
-        doe_samples = 180
-        doe_cpu_sec = doe_samples * val_avg_time
-        parallel_eff = 0.85
-        doe_wall_sec = doe_cpu_sec / (4.0 * parallel_eff)
-        per_sim_sec = val_avg_time
+    # 3. Explicit Speedup Accounting: Separate Measured from Extrapolated
+    manifest_data = load_actual_doe_manifest_times(outputs_dirs)
+    
+    if manifest_data is not None:
+        doe_wall_sec = manifest_data['total_doe_wall_sec']
+        doe_cpu_sec = manifest_data['total_doe_cpu_sec']
+        per_sim_sec = doe_cpu_sec / manifest_data['sim_count']
+        avg_workers = manifest_data['avg_workers']
+        parallel_eff = manifest_data['empirical_parallel_eff']
+        is_timing_measured = True
     else:
-        per_sim_sec = doe_cpu_sec / sim_count
+        # Fallback extrapolation clearly labeled
+        doe_samples = 180
+        per_sim_sec = val_avg_time
+        doe_cpu_sec = doe_samples * per_sim_sec
+        avg_workers = 4
+        parallel_eff = 0.85
+        doe_wall_sec = doe_cpu_sec / (avg_workers * parallel_eff)
+        is_timing_measured = False
         
     total_space = 5000
     extrapolated_serial_cpu_hours = (total_space * per_sim_sec) / 3600.0
-    # Defensible parallel time: accounts for empirical multi-worker parallel scaling efficiency
     extrapolated_parallel_wall_hours = extrapolated_serial_cpu_hours / (avg_workers * parallel_eff)
     
     ml_overhead_sec = 15.0
     
+    # Strictly separate CPU consumption from host wall-clock time
+    # Validation runs in serial for verification, so validation CPU time == validation wallclock
+    val_cpu_sec = total_val_wallclock
+    
     measured_ml_wall_sec = doe_wall_sec + ml_overhead_sec + total_val_wallclock
     measured_ml_wall_hours = measured_ml_wall_sec / 3600.0
     
-    measured_ml_cpu_sec = doe_cpu_sec + ml_overhead_sec + total_val_wallclock
+    measured_ml_cpu_sec = doe_cpu_sec + ml_overhead_sec + val_cpu_sec
     measured_ml_cpu_hours = measured_ml_cpu_sec / 3600.0
     
     speedup_wall = extrapolated_parallel_wall_hours / measured_ml_wall_hours if measured_ml_wall_hours > 0 else 0.0
     speedup_cpu = extrapolated_serial_cpu_hours / measured_ml_cpu_hours if measured_ml_cpu_hours > 0 else 0.0
     
-    # Optimizer quality metrics
-    opt_metrics = evaluate_optimizer_performance(df_val, dataset_cleaned_path)
+    # 2. Optimizer quality metrics evaluated strictly on reference ground truth
+    opt_metrics = evaluate_optimizer_performance(df_val, dataset_cleaned_path, percentile_threshold=0.90)
     
     print("\n" + "=" * 115)
     print("                DEFENSIBLE EMPIRICAL VALIDATION & SPEEDUP SUMMARY")
     print("=" * 115)
     print(f"Top-{len(df_val)} Mean Validation Error (MAPE) : {mean_val_error:.2f}% (Acceptance: <= 7.0%)")
-    print(f"Optimizer Top-K Hit Rate (>=85th pctile) : {opt_metrics['top_k_hit_rate_pct']:.1f}%")
-    print(f"Optimizer Simple Regret                  : {opt_metrics['simple_regret']:.4f} IPC delta")
+    print(f"Optimizer Evaluation Status              : {opt_metrics['status']}")
+    if opt_metrics['status'] == 'EVALUATED':
+        print(f"Optimizer Top-K Hit Rate (>=90th pctile) : {opt_metrics['top_k_hit_rate_pct']:.1f}%")
+        print(f"Optimizer Simple Regret                  : {opt_metrics['simple_regret']:.4f} IPC delta")
     print("-" * 115)
+    timing_label = "Measured Manifests" if is_timing_measured else "Extrapolated from Validation Runs"
+    print(f"Timing Source                            : {timing_label}")
     print(f"Measured Per-Sim Mean CPU Time           : {per_sim_sec:.2f} s")
-    print(f"Measured Parallel Worker Scaling Eff.    : {parallel_eff * 100.0:.1f}% (Workers: {avg_workers})")
+    print(f"Empirical Worker Scaling Efficiency      : {parallel_eff * 100.0:.1f}% ({avg_workers} Workers)")
     print(f"Exhaustive 5,000 Extrapolated Core-Hours : {extrapolated_serial_cpu_hours:.2f} Core-Hours (~{extrapolated_serial_cpu_hours/24:.1f} Days)")
     print(f"Exhaustive 5,000 Extrapolated Wall-Clock : {extrapolated_parallel_wall_hours:.2f} Hours")
     print(f"ML-Guided Measured Core-Hours            : {measured_ml_cpu_hours:.2f} Core-Hours")
     print(f"ML-Guided Measured Host Wall-Clock       : {measured_ml_wall_hours:.2f} Hours (~{measured_ml_wall_hours*60:.1f} Minutes)")
-    print(f"Measured Host Wall-Clock Speedup         : {speedup_wall:.1f}x Compute Reduction")
-    print(f"Measured Aggregate Core Speedup          : {speedup_cpu:.1f}x Core-Hour Reduction")
+    print(f"Estimated Host Wall-Clock Speedup        : {speedup_wall:.1f}x Compute Reduction (Extrapolated vs Measured)")
+    print(f"Estimated Aggregate Core Speedup         : {speedup_cpu:.1f}x Core-Hour Reduction (Extrapolated vs Measured)")
     print("=" * 115)
     
     plot_speedup_comparison(extrapolated_serial_cpu_hours, extrapolated_parallel_wall_hours,
                             measured_ml_wall_hours, measured_ml_cpu_hours,
-                            speedup_wall, speedup_cpu, "visualizations/speedup_comparison.png")
+                            speedup_wall, speedup_cpu, "visualizations/speedup_comparison.png",
+                            is_extrapolated=True)
     
     summary_report = {
         'mean_validation_error_pct': float(mean_val_error),
         'optimizer_metrics': opt_metrics,
-        'per_sim_measured_cpu_sec': float(per_sim_sec),
-        'empirical_parallel_scaling_efficiency': float(parallel_eff),
-        'extrapolated_exhaustive_serial_core_hours': float(extrapolated_serial_cpu_hours),
-        'extrapolated_exhaustive_parallel_wall_hours': float(extrapolated_parallel_wall_hours),
-        'measured_ml_guided_wall_hours': float(measured_ml_wall_hours),
-        'measured_ml_guided_cpu_hours': float(measured_ml_cpu_hours),
-        'defensible_host_wall_clock_speedup': float(speedup_wall),
-        'defensible_core_hour_speedup': float(speedup_cpu),
-        'accounting_methodology': 'Measured DoE manifest run durations combined with empirical multi-worker efficiency (no idealized linear scaling assumption)',
+        'timing_accounting': {
+            'is_timing_measured_from_manifests': is_timing_measured,
+            'per_sim_cpu_seconds': float(per_sim_sec),
+            'empirical_parallel_efficiency': float(parallel_eff),
+            'workers_count': avg_workers,
+            'doe_cpu_hours': float(doe_cpu_sec / 3600.0),
+            'doe_wall_clock_hours': float(doe_wall_sec / 3600.0),
+            'validation_cpu_hours': float(val_cpu_sec / 3600.0),
+            'validation_wall_clock_hours': float(total_val_wallclock / 3600.0),
+            'ml_pipeline_overhead_seconds': ml_overhead_sec,
+            'extrapolated_exhaustive_serial_core_hours': float(extrapolated_serial_cpu_hours),
+            'extrapolated_exhaustive_parallel_wall_hours': float(extrapolated_parallel_wall_hours),
+            'measured_ml_guided_wall_hours': float(measured_ml_wall_hours),
+            'measured_ml_guided_cpu_hours': float(measured_ml_cpu_hours),
+            'extrapolated_host_wall_clock_speedup': float(speedup_wall),
+            'extrapolated_core_hour_speedup': float(speedup_cpu)
+        },
         'validation_details': validation_results
     }
     with open("dataset/validation_summary.json", 'w') as f:

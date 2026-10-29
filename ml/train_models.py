@@ -23,7 +23,7 @@ from sklearn.model_selection import KFold, GroupKFold, train_test_split
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.linear_model import Ridge
+from sklearn.neighbors import KNeighborsRegressor
 from sklearn.ensemble import RandomForestRegressor, HistGradientBoostingRegressor
 from sklearn.metrics import r2_score, mean_absolute_percentage_error, root_mean_squared_error, mean_absolute_error
 from sklearn.inspection import permutation_importance
@@ -75,7 +75,7 @@ def build_preprocessor():
 
 def get_model_candidates():
     models = {
-        'Ridge': Ridge(alpha=1.0),
+        'KNN': KNeighborsRegressor(n_neighbors=5, weights='distance'),
         'RandomForest': RandomForestRegressor(n_estimators=200, max_depth=12, random_state=42, n_jobs=-1),
         'HistGradientBoosting': HistGradientBoostingRegressor(max_iter=250, learning_rate=0.08, min_samples_leaf=5, random_state=42)
     }

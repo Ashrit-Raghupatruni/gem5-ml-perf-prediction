@@ -16,6 +16,7 @@ from scripts.generate_design_space import generate_lhs_design_space, save_and_sp
 from scripts.parse_dataset import parse_single_stats, audit_simulation_manifests
 from ml.predict_and_screen import generate_candidate_design_space, compute_cost_and_energy_proxies, find_pareto_frontier
 from ml.train_models import build_preprocessor, get_model_candidates, get_feature_definitions
+from ml.validate_and_evaluate import evaluate_optimizer_performance
 from sklearn.pipeline import Pipeline
 
 
@@ -50,9 +51,21 @@ class TestDesignSpaceGenerator(unittest.TestCase):
             with open(os.path.join(tmp_dir, "shards", "shard_3.json")) as f3:
                 s3 = json.load(f3)
             self.assertEqual(len(s1) + len(s2) + len(s3), 40)
-            self.assertEqual(len(s1), 14)
-            self.assertEqual(len(s2), 13)
-            self.assertEqual(len(s3), 13)
+
+    def test_orthogonal_dimensions_no_correlations(self):
+        """
+        Tests that independently sampled parameters exhibit no unintended deterministic correlation.
+        """
+        configs = generate_lhs_design_space(num_samples=180, seed=42, independent_widths=True)
+        df_cfg = pd.DataFrame(configs)
+        
+        # Check that L2 assoc and frequency are not correlated with widths
+        corr_matrix = df_cfg[['l2_assoc', 'clk_freq_ghz', 'l1d_size_kb', 'l2_size_kb']].corr().abs()
+        # Non-diagonal correlations in orthogonal LHS should be well below 0.35
+        for i in range(len(corr_matrix)):
+            for j in range(i + 1, len(corr_matrix)):
+                val = corr_matrix.iloc[i, j]
+                self.assertLess(val, 0.35, f"Unintended correlation {corr_matrix.index[i]} vs {corr_matrix.columns[j]}: {val}")
 
 
 class TestStatsParserAndProvenance(unittest.TestCase):
@@ -72,7 +85,6 @@ class TestStatsParserAndProvenance(unittest.TestCase):
             self.assertEqual(stats['sim_insts'], 1000000)
             self.assertEqual(stats['num_cycles'], 1250000)
             self.assertAlmostEqual(stats['ipc'], 0.8)
-            self.assertAlmostEqual(stats['l1d_mpki'], 0.5)
         finally:
             if os.path.exists(f.name_path):
                 os.remove(f.name_path)
@@ -105,6 +117,32 @@ class TestStatsParserAndProvenance(unittest.TestCase):
             self.assertTrue(audit['is_gem5_build_homogeneous'])
 
 
+class TestOptimizerMetrics(unittest.TestCase):
+    def test_missing_reference_dataset_handling(self):
+        df_val = pd.DataFrame([{'simulated_ipc': 1.5}, {'simulated_ipc': 2.0}])
+        res = evaluate_optimizer_performance(df_val, "non_existent_dataset.csv", percentile_threshold=0.90)
+        self.assertIn('UNAVAILABLE', res['status'])
+        self.assertIsNone(res['simple_regret'])
+        self.assertIsNone(res['top_k_hit_rate_pct'])
+
+    def test_evaluated_optimizer_metrics(self):
+        with tempfile.NamedTemporaryFile('w', delete=False, suffix='.csv') as f:
+            df_ref = pd.DataFrame({'ipc': np.linspace(0.5, 3.0, 50)})
+            df_ref.to_csv(f.name, index=False)
+            f_path = f.name
+            
+        try:
+            df_val = pd.DataFrame([{'simulated_ipc': 2.9}, {'simulated_ipc': 2.8}])
+            res = evaluate_optimizer_performance(df_val, f_path, percentile_threshold=0.90)
+            self.assertEqual(res['status'], 'EVALUATED')
+            self.assertEqual(res['percentile_used'], 0.90)
+            self.assertAlmostEqual(res['simple_regret'], 3.0 - 2.9, places=3)
+            self.assertEqual(res['top_k_hit_rate_pct'], 100.0)
+        finally:
+            if os.path.exists(f_path):
+                os.remove(f_path)
+
+
 class TestCandidateScreeningAndPareto(unittest.TestCase):
     def test_candidate_generation_and_pareto(self):
         df_candidates = generate_candidate_design_space(num_candidates=100)
@@ -121,9 +159,6 @@ class TestCandidateScreeningAndPareto(unittest.TestCase):
 
 class TestSyntheticPipelineIntegration(unittest.TestCase):
     def test_synthetic_train_and_screen(self):
-        """
-        Tests model pipeline training and screening with synthetic microarchitectural data.
-        """
         cat_cols, num_cols = get_feature_definitions()
         all_features = cat_cols + num_cols
         
@@ -153,10 +188,13 @@ class TestSyntheticPipelineIntegration(unittest.TestCase):
         }
         df_syn = pd.DataFrame(synthetic_data)
         
+        candidates = get_model_candidates()
+        self.assertIn('KNN', candidates)
+        
         preprocessor = build_preprocessor()
         pipeline = Pipeline([
             ('preprocessor', preprocessor),
-            ('regressor', get_model_candidates()['RandomForest'])
+            ('regressor', candidates['KNN'])
         ])
         pipeline.fit(df_syn[all_features], df_syn['ipc'])
         

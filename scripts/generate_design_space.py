@@ -15,9 +15,26 @@ from scipy.stats import qmc
 def generate_lhs_design_space(num_samples=180, seed=42, independent_widths=True):
     """
     Samples microarchitectural space uniformly across 4 benchmarks.
-    When independent_widths=True, decouples fetch, decode, issue, and commit widths
-    subject to microarchitectural monotonic legality: issue <= decode <= fetch, commit >= issue.
-    Also independently varies ROB, IQ, LQ, SQ, and physical register counts within feasible physical bounds.
+    When independent_widths=True, every independently varied parameter is assigned
+    its own unique dimension in the LHS matrix (d=17):
+      dim 0: fetch_width
+      dim 1: decode_width
+      dim 2: issue_width
+      dim 3: commit_width
+      dim 4: rob_entries
+      dim 5: iq_entries
+      dim 6: lq_entries
+      dim 7: sq_entries
+      dim 8: phys_int_regs
+      dim 9: l1d_size_kb
+      dim 10: l1d_assoc
+      dim 11: l1i_size_kb
+      dim 12: l1i_assoc
+      dim 13: l2_size_kb
+      dim 14: l2_assoc
+      dim 15: clk_freq_ghz
+      dim 16: branch_predictor
+    Ensures zero dimension-reuse or unintended inter-parameter correlations.
     """
     workloads = ['matmul', 'stream', 'quicksort', 'hash']
     base_samples = num_samples // len(workloads)
@@ -36,8 +53,8 @@ def generate_lhs_design_space(num_samples=180, seed=42, independent_widths=True)
     freqs = [1.5, 2.0, 2.4, 3.0]
     branch_preds = ['TournamentBP', 'BiModeBP', 'LocalBP']
     
-    # 14 LHS dimensions for decoupled microarchitecture
-    dim = 14 if independent_widths else 10
+    # 17 orthogonal LHS dimensions for decoupled microarchitecture
+    dim = 17 if independent_widths else 10
     sampler = qmc.LatinHypercube(d=dim, seed=seed)
     
     all_configs = []
@@ -84,14 +101,15 @@ def generate_lhs_design_space(num_samples=180, seed=42, independent_widths=True)
                 phys_high = min(256, max(phys_low + 10, int(rob * 1.1)))
                 phys_regs = int(phys_low + s[8] * (phys_high - phys_low))
                 
+                # Caches, clocks, branch predictors - EACH HAS ITS OWN EXCLUSIVE DIMENSION:
                 l1d_s = l1d_sizes[int(s[9] * len(l1d_sizes))]
                 l1d_a = l1d_assocs[int(s[10] * len(l1d_assocs))]
                 l1i_s = l1i_sizes[int(s[11] * len(l1i_sizes))]
                 l1i_a = l1i_assocs[int(s[12] * len(l1i_assocs))]
                 l2_s = l2_sizes[int(s[13] * len(l2_sizes))]
-                l2_a = l2_assocs[int(s[0] * len(l2_assocs))] # reuse index for categorical
-                freq = freqs[int(s[1] * len(freqs))]
-                bp = branch_preds[int(s[2] * len(branch_preds))]
+                l2_a = l2_assocs[int(s[14] * len(l2_assocs))]
+                freq = freqs[int(s[15] * len(freqs))]
+                bp = branch_preds[int(s[16] * len(branch_preds))]
             else:
                 # Coupled mode for backward compatibility
                 w = widths_allowed[int(s[0] * len(widths_allowed))]
