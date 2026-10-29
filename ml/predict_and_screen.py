@@ -19,15 +19,19 @@ import seaborn as sns
 import joblib
 
 
-def generate_candidate_design_space(num_candidates=5000, workloads=None):
+def generate_candidate_design_space(num_candidates=5000, workloads=None, seed=42):
     """
-    Synthesizes a legal combinatorial design space covering pipeline widths,
+    Synthesizes a legal combinatorial design space covering independent pipeline widths,
     out-of-order buffers, multi-level cache hierarchies, and frequencies.
+    Aligned with the decoupled parameter space of the LHS generator:
+      - Independent fetch, decode, issue, commit widths adhering to monotonic hardware constraints:
+        issue <= decode <= fetch, commit >= issue
+      - Decoupled queue capacities (IQ, LQ, SQ) and physical registers within physical feasibility bounds.
     """
     if workloads is None:
         workloads = ['matmul', 'stream', 'quicksort', 'hash']
         
-    widths = [2, 4, 8]
+    widths_allowed = [2, 4, 8]
     rob_sizes = [64, 96, 128, 192, 256]
     l1d_sizes = [16, 32, 64, 128]
     l1d_assocs = [2, 4, 8]
@@ -39,7 +43,7 @@ def generate_candidate_design_space(num_candidates=5000, workloads=None):
     branch_preds = ['TournamentBP', 'BiModeBP', 'LocalBP']
     
     candidates = []
-    np.random.seed(42)
+    rng = np.random.default_rng(seed)
     
     total_samples_per_workload = num_candidates // len(workloads)
     remainder = num_candidates % len(workloads)
@@ -47,30 +51,47 @@ def generate_candidate_design_space(num_candidates=5000, workloads=None):
     for idx, wl in enumerate(workloads):
         count = total_samples_per_workload + (1 if idx < remainder else 0)
         for _ in range(count):
-            w = int(np.random.choice(widths))
-            rob = int(np.random.choice(rob_sizes))
+            # Decoupled widths with monotonic microarchitectural constraints
+            fetch_w = int(rng.choice(widths_allowed))
+            decode_candidates = [w for w in widths_allowed if w <= fetch_w]
+            decode_w = int(rng.choice(decode_candidates))
+            issue_candidates = [w for w in widths_allowed if w <= decode_w]
+            issue_w = int(rng.choice(issue_candidates))
+            commit_candidates = [w for w in widths_allowed if w >= issue_w]
+            commit_w = int(rng.choice(commit_candidates))
             
-            # Legality constraints: LQ + SQ <= ROB, IQ <= ROB
-            iq = min(96, max(32, int(rob * 0.4)))
-            lq = min(64, max(16, int(rob * 0.25)))
-            sq = min(64, max(16, int(rob * 0.25)))
-            phys_regs = min(256, max(128, int(rob * 0.8)))
+            rob = int(rng.choice(rob_sizes))
             
-            l1d_s = int(np.random.choice(l1d_sizes))
-            l1d_a = int(np.random.choice(l1d_assocs))
-            l1i_s = int(np.random.choice(l1i_sizes))
-            l1i_a = int(np.random.choice(l1i_assocs))
-            l2_s = int(np.random.choice(l2_sizes))
-            l2_a = int(np.random.choice(l2_assocs))
-            freq = float(np.random.choice(freqs))
-            bp = str(np.random.choice(branch_preds))
+            # Decoupled queue sizes within legal physical microarchitectural ranges
+            iq_low = 32
+            iq_high = min(96, rob)
+            iq = int(rng.integers(iq_low, iq_high + 1))
+            
+            lq_high = min(64, max(16, int(rob * 0.4)))
+            lq = int(rng.integers(16, lq_high + 1)) if lq_high > 16 else 16
+            
+            sq_high = min(64, max(16, int(rob * 0.4)))
+            sq = int(rng.integers(16, sq_high + 1)) if sq_high > 16 else 16
+            
+            phys_low = max(128, int(rob * 0.5))
+            phys_high = min(256, max(phys_low + 10, int(rob * 1.1)))
+            phys_regs = int(rng.integers(phys_low, phys_high + 1))
+            
+            l1d_s = int(rng.choice(l1d_sizes))
+            l1d_a = int(rng.choice(l1d_assocs))
+            l1i_s = int(rng.choice(l1i_sizes))
+            l1i_a = int(rng.choice(l1i_assocs))
+            l2_s = int(rng.choice(l2_sizes))
+            l2_a = int(rng.choice(l2_assocs))
+            freq = float(rng.choice(freqs))
+            bp = str(rng.choice(branch_preds))
             
             candidates.append({
                 'workload': wl,
-                'fetch_width': w,
-                'decode_width': w,
-                'issue_width': w,
-                'commit_width': w,
+                'fetch_width': fetch_w,
+                'decode_width': decode_w,
+                'issue_width': issue_w,
+                'commit_width': commit_w,
                 'rob_entries': rob,
                 'iq_entries': iq,
                 'lq_entries': lq,
@@ -95,15 +116,17 @@ def compute_cost_and_energy_proxies(df):
     """
     Computes:
     1. Area / Complexity Proxy:
-       Area = 1.5*Width + 0.05*ROB + 0.8*log2(L1D) + 0.4*log2(L2) + 0.2*L1D_assoc + 0.1*L2_assoc
+       Area = 1.0*Fetch + 0.3*Decode + 0.5*Issue + 0.2*Commit + 0.05*ROB + 0.8*log2(L1D) + 0.4*log2(L2) + 0.2*L1D_assoc + 0.1*L2_assoc
     2. Dynamic Power Proxy:
-       Dynamic Power ~ V^2 * f * C_eff ~ f^3 (assuming standard voltage-frequency scaling)
-       Power Proxy = (clk_freq_ghz)^2.5 * (1.0 + 0.15*Width + 0.005*ROB)
+       Power Proxy = (clk_freq_ghz)^2.5 * (1.0 + 0.10*fetch_width + 0.05*issue_width + 0.005*ROB)
     3. Energy per Instruction Proxy (EDAP):
        Energy ~ Power / IPC
     """
     area_cost = (
-        1.5 * df['fetch_width'] +
+        1.0 * df['fetch_width'] +
+        0.3 * df['decode_width'] +
+        0.5 * df['issue_width'] +
+        0.2 * df['commit_width'] +
         0.05 * df['rob_entries'] +
         0.8 * np.log2(df['l1d_size_kb']) +
         0.4 * np.log2(df['l2_size_kb']) +
@@ -111,7 +134,7 @@ def compute_cost_and_energy_proxies(df):
         0.1 * df['l2_assoc']
     )
     
-    power_proxy = (df['clk_freq_ghz'] ** 2.5) * (1.0 + 0.15 * df['fetch_width'] + 0.005 * df['rob_entries'])
+    power_proxy = (df['clk_freq_ghz'] ** 2.5) * (1.0 + 0.10 * df['fetch_width'] + 0.05 * df['issue_width'] + 0.005 * df['rob_entries'])
     ipc_safe = np.maximum(df['predicted_ipc'], 0.05)
     energy_proxy = power_proxy / ipc_safe
     
@@ -131,7 +154,6 @@ def predict_with_uncertainty(pipeline, df_features):
     mean_pred = regressor.predict(X_trans)
     
     if hasattr(regressor, 'estimators_'):
-        # Random Forest: predictions across individual decision trees
         tree_preds = np.array([tree.predict(X_trans) for tree in regressor.estimators_])
         std_pred = np.std(tree_preds, axis=0)
     else:
@@ -214,7 +236,7 @@ def screen_candidates(model_path, num_candidates=5000, top_k=5, kappa=1.5, outpu
     print(f"[INFO] Loading surrogate ML pipeline from: {model_path}")
     pipeline = joblib.load(model_path)
     
-    print(f"[INFO] Synthesizing {num_candidates} legal candidate microarchitectural configurations...")
+    print(f"[INFO] Synthesizing {num_candidates} legal decoupled candidate microarchitectural configurations...")
     df_candidates = generate_candidate_design_space(num_candidates=num_candidates)
     
     print("[INFO] Running millisecond batch surrogate inference with epistemic uncertainty estimation...")
@@ -224,7 +246,6 @@ def screen_candidates(model_path, num_candidates=5000, top_k=5, kappa=1.5, outpu
     
     df_candidates['predicted_ipc'] = pred_mean
     df_candidates['predicted_ipc_std'] = pred_std
-    # Upper Confidence Bound for optimistic exploration under uncertainty: UCB = mu + kappa * sigma
     df_candidates['ucb_ipc'] = pred_mean + (kappa * pred_std)
     
     area_proxy, power_proxy, energy_proxy = compute_cost_and_energy_proxies(df_candidates)
@@ -236,7 +257,6 @@ def screen_candidates(model_path, num_candidates=5000, top_k=5, kappa=1.5, outpu
     
     df_evaluated = find_pareto_frontier(df_candidates, cost_col='hardware_cost_proxy', perf_col='predicted_ipc')
     
-    # Select Top-K optimal designs on Pareto frontier
     pareto_candidates = df_evaluated[df_evaluated['is_pareto']].copy()
     if len(pareto_candidates) < top_k:
         selected_candidates = df_evaluated.sort_values(by='predicted_ipc', ascending=False).head(top_k)
@@ -244,16 +264,16 @@ def screen_candidates(model_path, num_candidates=5000, top_k=5, kappa=1.5, outpu
         indices = np.linspace(0, len(pareto_candidates) - 1, top_k, dtype=int)
         selected_candidates = pareto_candidates.iloc[indices]
         
-    print("\n" + "=" * 125)
+    print("\n" + "=" * 135)
     print(f"      TOP-{top_k} PREDICTED PARETO-OPTIMAL CONFIGURATIONS FOR GEM5 VALIDATION")
-    print("=" * 125)
-    print(f"{'ID':<8} | {'Workload':<10} | {'W':<3} | {'ROB':<5} | {'L1D':<5} | {'L2':<5} | {'Freq':<7} | {'Pred IPC':<10} | {'Std (Uncert)':<12} | {'Cost Proxy':<10}")
-    print("-" * 125)
+    print("=" * 135)
+    print(f"{'ID':<8} | {'Workload':<10} | {'FW':<3} | {'DW':<3} | {'IW':<3} | {'CW':<3} | {'ROB':<5} | {'L1D':<5} | {'L2':<5} | {'Freq':<7} | {'Pred IPC':<10} | {'Cost Proxy':<10}")
+    print("-" * 135)
     
     top_candidates_list = []
     for idx, (_, row) in enumerate(selected_candidates.iterrows(), 1):
         cid = f"TOP_{idx:02d}"
-        print(f"{cid:<8} | {row['workload']:<10} | {row['fetch_width']:<3} | {row['rob_entries']:<5} | {row['l1d_size_kb']:<5} | {row['l2_size_kb']:<5} | {row['clk_freq_ghz']:<5.1f}GHz | {row['predicted_ipc']:<10.4f} | +/-{row['predicted_ipc_std']:<10.4f} | {row['hardware_cost_proxy']:<10.2f}")
+        print(f"{cid:<8} | {row['workload']:<10} | {row['fetch_width']:<3} | {row['decode_width']:<3} | {row['issue_width']:<3} | {row['commit_width']:<3} | {row['rob_entries']:<5} | {row['l1d_size_kb']:<5} | {row['l2_size_kb']:<5} | {row['clk_freq_ghz']:<5.1f}GHz | {row['predicted_ipc']:<10.4f} | {row['hardware_cost_proxy']:<10.2f}")
         
         top_candidates_list.append({
             'candidate_id': cid,
@@ -287,7 +307,7 @@ def screen_candidates(model_path, num_candidates=5000, top_k=5, kappa=1.5, outpu
             'power_proxy': float(row['power_proxy']),
             'energy_proxy': float(row['energy_proxy'])
         })
-    print("=" * 125)
+    print("=" * 135)
     
     os.makedirs(os.path.dirname(output_json), exist_ok=True)
     with open(output_json, 'w') as f:

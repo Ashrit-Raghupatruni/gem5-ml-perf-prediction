@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Active Learning Empirical Benchmarking Engine with Multi-Seed Statistical Validation
+Active Learning Empirical Benchmarking Engine with Multi-Seed Controlled Baseline
 Project: ML-Based Microarchitectural Performance Prediction (ARM gem5)
-Compares Uncertainty Sampling vs UCB vs Random Sampling under identical simulation budgets across repeated seeds.
+Strictly guarantees every strategy begins from the IDENTICAL initial seed pool and test split per seed.
 """
 
 import os
@@ -22,13 +22,14 @@ from sklearn.pipeline import Pipeline
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from ml.train_models import build_preprocessor, get_feature_definitions
-from ml.predict_and_screen import generate_candidate_design_space, predict_with_uncertainty
+from ml.predict_and_screen import predict_with_uncertainty
 
 
 def run_active_learning_benchmark(dataset_path, output_dir="visualizations", initial_budget=20, query_step=5, max_budget=70, n_seeds=5):
     """
-    Simulates sample-efficiency curves across query strategies on ground-truth gem5 data
-    averaged over multiple random seeds to ensure statistical significance.
+    Simulates sample-efficiency curves across query strategies on ground-truth gem5 data.
+    Controlled comparison: For every random seed, the test split and initial training pool
+    are strictly identical across all active learning strategies before exploration starts.
     """
     if not os.path.exists(dataset_path):
         print(f"[ERROR] Dataset not found: {dataset_path}")
@@ -44,17 +45,18 @@ def run_active_learning_benchmark(dataset_path, output_dir="visualizations", ini
     strategies = ['Uncertainty Sampling', 'UCB Sampling', 'Random Sampling']
     budgets = list(range(initial_budget, max_budget + 1, query_step))
     
-    # Store runs across seeds: strat -> budget -> list of metric values
     metrics_r2 = {strat: {b: [] for b in budgets} for strat in strategies}
     metrics_mape = {strat: {b: [] for b in budgets} for strat in strategies}
     metrics_best_ipc = {strat: {b: [] for b in budgets} for strat in strategies}
     
-    print(f"[INFO] Benchmarking Active Learning strategies over {n_seeds} random seeds across budgets {budgets}...")
+    print(f"[INFO] Benchmarking Active Learning strategies over {n_seeds} random seeds with shared baseline initialization...")
     
     seeds = [42 + i * 17 for i in range(n_seeds)]
     
     for seed in seeds:
         rng = np.random.default_rng(seed)
+        
+        # 1. Strictly identical held-out test split for this seed
         test_indices = rng.choice(len(df), size=int(len(df) * 0.25), replace=False)
         train_pool_indices = np.setdiff1d(np.arange(len(df)), test_indices)
         
@@ -62,10 +64,15 @@ def run_active_learning_benchmark(dataset_path, output_dir="visualizations", ini
         X_test = test_df[all_features]
         y_test = test_df['ipc']
         
+        # 2. Strictly identical initial seed training pool for all strategies in this seed
+        seed_init_train_idx = list(rng.choice(train_pool_indices, size=initial_budget, replace=False))
+        seed_init_available_pool = list(np.setdiff1d(train_pool_indices, seed_init_train_idx))
+        
         for strat in strategies:
-            available_pool = list(train_pool_indices.copy())
-            current_train_idx = list(rng.choice(available_pool, size=initial_budget, replace=False))
-            available_pool = list(np.setdiff1d(available_pool, current_train_idx))
+            # Independent copy of the shared initial training pool and pool for each strategy
+            current_train_idx = list(seed_init_train_idx.copy())
+            available_pool = list(seed_init_available_pool.copy())
+            strat_rng = np.random.default_rng(seed)
             
             for b in budgets:
                 train_sub_df = df.iloc[current_train_idx].copy()
@@ -98,8 +105,8 @@ def run_active_learning_benchmark(dataset_path, output_dir="visualizations", ini
                 elif strat == 'UCB Sampling':
                     ucb_scores = mean_preds + (1.5 * std_preds)
                     ranked_idx = np.argsort(ucb_scores)[::-1][:query_step]
-                else:
-                    ranked_idx = rng.choice(len(available_pool), size=query_step, replace=False)
+                else: # Random
+                    ranked_idx = strat_rng.choice(len(available_pool), size=query_step, replace=False)
                     
                 new_queries = [available_pool[i] for i in ranked_idx]
                 current_train_idx.extend(new_queries)
@@ -156,7 +163,7 @@ def run_active_learning_benchmark(dataset_path, output_dir="visualizations", ini
     summary_path = os.path.join("dataset", "active_learning_benchmark.json")
     with open(summary_path, 'w') as f:
         json.dump(summary_results, f, indent=2)
-    print(f"[SUCCESS] Saved Active Learning multi-seed benchmark JSON to: {summary_path}")
+    print(f"[SUCCESS] Saved Active Learning controlled multi-seed benchmark JSON to: {summary_path}")
 
 
 if __name__ == '__main__':
