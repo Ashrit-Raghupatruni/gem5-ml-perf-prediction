@@ -1,6 +1,6 @@
 {
-  "total_runs_scanned": 300,
-  "valid_runs_harvested": 300,
+  "total_runs_scanned": 2000,
+  "valid_runs_harvested": 2000,
   "duplicates_removed": 0,
   "missing_stats_count": 0,
   "invalid_stats_count": 0,
@@ -20,20 +20,20 @@
     "is_git_commit_homogeneous": true
   },
   "workload_distribution": {
-    "stream": 75,
-    "quicksort": 75,
-    "hash": 75,
-    "matmul": 75
+    "hash": 500,
+    "stream": 500,
+    "matmul": 500,
+    "quicksort": 500
   },
   "feature_summary": {
-    "ipc_min": 0.368858,
-    "ipc_max": 3.105611,
-    "ipc_mean": 1.1309352899999998,
-    "ipc_std": 0.45431757613561286,
-    "cycles_min": 341450,
-    "cycles_max": 3272338,
+    "ipc_min": 0.354209,
+    "ipc_max": 4.025583,
+    "ipc_mean": 1.118992483,
+    "ipc_std": 0.45050821474159886,
+    "cycles_min": 263418,
+    "cycles_max": 3347131,
     "sim_insts_min": 865654,
     "sim_insts_max": 2802108
   },
-  "sha256": "7e2e0fca49e641c8c26b7eb5285899968ef9cc04aa8ddf9880f959d67a12cfe1"
+  "sha256": "a464e15b0a48cc41d07074a2637f3f944b80ec1f8764a970c594e33d1f0245d9"
 }

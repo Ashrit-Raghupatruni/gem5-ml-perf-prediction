@@ -206,9 +206,49 @@ def harvest_dataset(configs_json, output_dirs, out_csv, quality_report_path=None
     df = df.drop_duplicates(subset=['config_id', 'workload'], keep='last')
     duplicates_removed = raw_count - len(df)
     
+    # Split and export into separate Features and Outputs CSV files
+    feature_cols = [
+        'config_id', 'workload', 'fetch_width', 'decode_width', 'issue_width', 'commit_width',
+        'rob_entries', 'iq_entries', 'lq_entries', 'sq_entries',
+        'phys_int_regs', 'phys_fp_regs', 'branch_predictor',
+        'l1d_size_kb', 'l1d_assoc', 'l1i_size_kb', 'l1i_assoc',
+        'l2_size_kb', 'l2_assoc', 'clk_freq_ghz'
+    ]
+    output_cols = [
+        'config_id', 'workload', 'sim_seconds', 'sim_insts', 'num_cycles',
+        'ipc', 'cpi', 'l1d_misses', 'l1d_mpki', 'l2_misses', 'l2_mpki',
+        'branch_mispred_count', 'branch_mispred_rate',
+        'dram_reads', 'dram_writes', 'dram_total_reqs'
+    ]
+    
+    # Save unified clean dataset
     os.makedirs(os.path.dirname(out_csv), exist_ok=True)
     df.to_csv(out_csv, index=False)
     print(f"[SUCCESS] Harvested {len(df)} validated samples to: {out_csv}")
+    
+    # Save separate feature and target CSVs
+    dataset_dir = os.path.dirname(out_csv)
+    features_csv = os.path.join(dataset_dir, "dataset_features.csv")
+    outputs_csv = os.path.join(dataset_dir, "dataset_outputs.csv")
+    
+    present_feature_cols = [c for c in feature_cols if c in df.columns]
+    present_output_cols = [c for c in output_cols if c in df.columns]
+    
+    df[present_feature_cols].to_csv(features_csv, index=False)
+    print(f"[SUCCESS] Exported input features ({len(present_feature_cols)} cols) to: {features_csv}")
+    
+    df[present_output_cols].to_csv(outputs_csv, index=False)
+    print(f"[SUCCESS] Exported simulation output targets ({len(present_output_cols)} cols) to: {outputs_csv}")
+    
+    # Also save copies into outputs/ folder for easy access
+    outputs_folder = output_dirs[0] if output_dirs else "outputs"
+    os.makedirs(outputs_folder, exist_ok=True)
+    out_features_csv = os.path.join(outputs_folder, "features.csv")
+    out_targets_csv = os.path.join(outputs_folder, "outputs.csv")
+    df[present_feature_cols].to_csv(out_features_csv, index=False)
+    df[present_output_cols].to_csv(out_targets_csv, index=False)
+    print(f"[SUCCESS] Stored features copy to: {out_features_csv}")
+    print(f"[SUCCESS] Stored outputs copy to: {out_targets_csv}")
     
     # Compute SHA-256 checksum
     with open(out_csv, 'rb') as f:
@@ -247,7 +287,13 @@ def harvest_dataset(configs_json, output_dirs, out_csv, quality_report_path=None
     }
     with open(quality_report_path, 'w') as f:
         json.dump(report, f, indent=2)
-    print(f"[SUCCESS] Quality report with provenance audit generated: {quality_report_path}")
+    print(f"[SUCCESS] Quality report generated: {quality_report_path}")
+    
+    # Also save copy of quality report to outputs/
+    out_quality_report = os.path.join(outputs_folder, "dataset_quality_report.json")
+    with open(out_quality_report, 'w') as f:
+        json.dump(report, f, indent=2)
+    print(f"[SUCCESS] Quality report copy saved to: {out_quality_report}")
 
 
 if __name__ == '__main__':

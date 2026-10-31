@@ -60,12 +60,8 @@ gem5-ml-perf-prediction/
 │   └── stream-arm                   # Pre-compiled AArch64 binary (memory streaming)
 ├── configs/
 │   ├── arm_o3_parametric.py         # gem5 Python configuration script for ARM O3 CPU
-│   ├── failed_59_configs.json       # Targeted shard for retrying transient/repaired runs
+│   ├── failed_59_configs.json       # Targeted batch for retrying transient/repaired runs
 │   ├── sweep_configs.json           # Master JSON containing user-generated LHS configurations
-│   └── shards/
-│       ├── shard_1.json             # Partitioned configuration shard 1
-│       ├── shard_2.json             # Partitioned configuration shard 2
-│       └── shard_3.json             # Partitioned configuration shard 3
 ├── dataset/
 │   ├── active_learning_benchmark.json # Empirical sample-efficiency benchmark results
 │   ├── dataset_cleaned.csv          # Harvested, validated dataset of simulation runs
@@ -100,7 +96,7 @@ gem5-ml-perf-prediction/
 │   ├── run_CFG_001_matmul/
 │   └── ...
 ├── scripts/
-│   ├── generate_design_space.py     # 17-D Latin Hypercube Sampling generator & sharder
+│   ├── generate_design_space.py     # 17-D Latin Hypercube Sampling generator
 │   ├── parse_dataset.py             # gem5 output harvester & multi-machine audit tool
 │   └── run_parallel_sweep.py        # Multiprocessing gem5 parallel execution harness
 ├── tests/
@@ -136,7 +132,7 @@ Evaluating microarchitecture trade-offs is constrained by the simulation through
 ```mermaid
 flowchart TD
     subgraph Phase1["1. Design Space Exploration (DoE)"]
-        A["generate_design_space.py<br/>--samples N --shards K"] --> B["sweep_configs.json & shards/"]
+        A["generate_design_space.py<br/>--samples N"] --> B["sweep_configs.json"]
     end
 
     subgraph Phase2["2. Cycle-Accurate gem5 Simulation"]
@@ -175,8 +171,8 @@ flowchart TD
 
 | Step | Stage Name | Responsible Script | Input Files / Arguments | Primary Output Files |
 | :--- | :--- | :--- | :--- | :--- |
-| **1** | Design Space Generation | `scripts/generate_design_space.py` | `--samples 300 --shards 3 --seed 42` | `configs/sweep_configs.json`, `configs/shards/shard_*.json` |
-| **2** | Parallel gem5 Simulation | `scripts/run_parallel_sweep.py` | `--shard configs/shards/shard_1.json --workers 8` | `outputs/run_CFG_*_{workload}/run.log`, `stats.txt` |
+| **1** | Design Space Generation | `scripts/generate_design_space.py` | `--samples 2000 --seed 42` | `configs/sweep_configs.json`, `configs/sweep_configs.json` |
+| **2** | Parallel gem5 Simulation | `scripts/run_parallel_sweep.py` | `--configs configs/sweep_configs.json --workers 8` | `outputs/run_CFG_*_{workload}/run.log`, `stats.txt` |
 | **3** | Output Harvesting & Quality Audit | `scripts/parse_dataset.py` | `--configs configs/sweep_configs.json --inputs outputs` | `dataset/dataset_cleaned.csv`, `dataset_quality_report.json` |
 | **4** | Model Training & CV | `ml/train_models.py` | `--dataset dataset/dataset_cleaned.csv --target ipc` | `ml/saved_models/best_model_ipc.joblib`, `model_metadata.json` |
 | **5** | Visualizing Feature Importance | `ml/train_models.py` (integrated) | Test split data & pipeline | `visualizations/feature_importance.png`, `predicted_vs_actual.png` |
@@ -191,7 +187,6 @@ flowchart TD
 
 ### A. Configuration & Sweep Inputs
 - `--samples` *(int, required)*: Total number of design configurations to generate. Must be a positive integer (e.g., `300`, `500`, `1000`, `2000`).
-- `--shards` *(int, default: 3)*: Number of disjoint JSON shard files into which the master configurations are split for parallel multi-laptop or multi-core execution.
 - `--seed` *(int, default: 42)*: Random seed ensuring reproducible Latin Hypercube Sampling.
 - `--coupled` *(flag, optional)*: Reverts pipeline widths and buffer sizes to legacy locked proportions for backwards-compatibility studies.
 - `--gem5` *(string, default: `/home/ashrit/gem5/build/ARM/gem5.opt`)*: Absolute path to the compiled gem5 binary.
@@ -264,7 +259,6 @@ Preprocessing is constructed using scikit-learn's `ColumnTransformer` inside an 
    - $\text{Physical Registers} \in [\max(128, \lfloor 0.5 \times \text{ROB} \rfloor), \min(256, \lfloor 1.1 \times \text{ROB} \rfloor)]$
 3. **Fair Workload Remainder Allocation**:
    When sample count $N$ is not cleanly divisible by the 4 workloads ($N \pmod 4 = r$), the remainder $r$ samples are distributed one-by-one to the first $r$ workloads, guaranteeing that $|N_{\text{workload}_i} - N_{\text{workload}_j}| \le 1$.
-4. **Sharding**: The master configuration list is partitioned across $K$ shards using `divmod(len(configs), num_shards)` without dropping or duplicating any configurations.
 5. **Quality Verification**:
    - `scripts/parse_dataset.py` inspects every output run directory.
    - It requires `simInsts > 0`, non-zero cycles, and non-empty `stats.txt`.
@@ -447,7 +441,7 @@ Implemented in `ml/active_learning.py` and benchmarked in `ml/benchmark_active_l
 | Output File Path | Format | Generation Script | Contents and Purpose |
 | :--- | :--- | :--- | :--- |
 | `configs/sweep_configs.json` | JSON | `scripts/generate_design_space.py` | Master list of all user-configured LHS design points. |
-| `configs/shards/shard_*.json` | JSON | `scripts/generate_design_space.py` | Disjoint shards for multi-worker parallel execution. |
+| `configs/sweep_configs.json` | JSON | `scripts/generate_design_space.py` | Master configurations for parallel simulation sweep. |
 | `outputs/run_*/stats.txt` | Text | gem5 simulator | Raw cycle-accurate performance counters and stats. |
 | `dataset/dataset_cleaned.csv` | CSV | `scripts/parse_dataset.py` | Clean tabular dataset linking configs with simulated IPC. |
 | `dataset/dataset_cleaned.csv.sha256` | Checksum | `scripts/parse_dataset.py` | Cryptographic verification digest for dataset reproducibility. |
@@ -528,16 +522,16 @@ pip install -r requirements.txt
 
 ### Step 1: Generate Decoupled Design Space Configurations
 ```bash
-# Generate 300 configurations split across 3 shards
-python3 scripts/generate_design_space.py --samples 300 --shards 3 --seed 42 --output-dir configs
+# Generate 300 configurations for the simulation sweep
+python3 scripts/generate_design_space.py --samples 2000 --seed 42 --output-dir configs
 ```
 *Verification*: Check that `configs/sweep_configs.json` contains exactly 300 JSON objects.
 
 ### Step 2: Execute Parallel gem5 Simulations
 ```bash
-# Run Shard 1 with 8 parallel worker processes
+# Run the simulation sweep with 8 parallel worker processes
 python3 scripts/run_parallel_sweep.py \
-  --shard configs/shards/shard_1.json \
+  --configs configs/sweep_configs.json \
   --gem5 /home/ashrit/gem5/build/ARM/gem5.opt \
   --workers 8 \
   --out-dir outputs
@@ -605,7 +599,7 @@ python3 -m unittest discover tests -v
 1. `TestDesignSpaceGenerator.test_arbitrary_sample_counts`: Validates exact generation for sample counts of 100, 180, 300, 501.
 2. `TestDesignSpaceGenerator.test_invalid_sample_count_inputs`: Verifies rejection of 0, negative values, and non-integer inputs.
 3. `TestDesignSpaceGenerator.test_workload_distribution_remainder_handling`: Verifies fair remainder distribution across workloads.
-4. `TestDesignSpaceGenerator.test_shard_partitioning_and_boundaries`: Confirms shard partitioning sums exactly to $N$ with disjoint boundaries.
+4. `TestDesignSpaceGenerator.test_save_configs_and_boundaries`: Confirms configuration generation sums exactly to $N$ with disjoint boundaries.
 5. `TestDesignSpaceGenerator.test_monotonic_hardware_constraints`: Verifies $\text{issue} \le \text{decode} \le \text{fetch}$ and $\text{commit} \ge \text{issue}$.
 6. `TestDesignSpaceGenerator.test_orthogonal_dimensions_no_correlations`: Verifies 17-dimensional LHS sampling without dimension reuse.
 7. `TestStatsParserAndProvenance.test_parse_valid_stats`: Tests parsing of valid `simInsts`, `numCycles`, and cache misses.

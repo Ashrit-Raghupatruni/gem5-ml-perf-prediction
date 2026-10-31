@@ -96,7 +96,7 @@ gem5-ml-perf-prediction/
 ├── configs/                            # gem5 Architecture Configuration Engine
 │       arm_o3_parametric.py            # Parametric ARM O3CPU + 2-Level Cache + Memory model
 │       sweep_configs.json              # Master 180 LHS sampled configuration points (generated)
-│       shards/                         # Sharded configurations for distributed execution
+│       # Sweep configuration files
 │       
 ├── dataset/                            # Cleaned Datasets & Quality Manifests (generated)
 │       .gitkeep
@@ -154,13 +154,13 @@ make -C benchmarks
 
 ### 3. Generate Latin Hypercube Design Space ($d=17$ Orthogonal Dimensions)
 ```bash
-python3 scripts/generate_design_space.py --samples 180 --shards 3 --seed 42 --output-dir configs
+python3 scripts/generate_design_space.py --samples 2000 --seed 42 --output-dir configs
 ```
 
 ### 4. Run Parallel gem5 Simulations
 ```bash
 python3 scripts/run_parallel_sweep.py \
-  --shard configs/sweep_configs.json \
+  --configs configs/sweep_configs.json \
   --gem5 /home/ashrit/gem5/build/ARM/gem5.opt \
   --script configs/arm_o3_parametric.py \
   --benchmarks benchmarks \

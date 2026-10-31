@@ -118,8 +118,8 @@ python3 ml/validate_and_evaluate.py \
 ```
 
 ### Outputs Generated:
-- `dataset/validation_results.csv` *(Per-candidate ground-truth vs predicted IPC with errors)*
-- `dataset/validation_summary.json` *(Speedup metrics and validation error summary)*
+- `dataset/validation_results.csv` and `outputs/validation_results.csv` *(Per-candidate ground-truth vs predicted IPC with errors)*
+- `dataset/validation_summary.json` and `outputs/validation_summary.json` *(Speedup metrics and validation error summary)*
 - `visualizations/speedup_comparison.png` *(Wall-clock and core-hour speedup charts)*
 
 ---

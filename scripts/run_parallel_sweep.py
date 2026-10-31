@@ -172,17 +172,17 @@ def run_single_simulation(task_args):
     }
 
 
-def execute_parallel_sweep(shard_json, gem5_bin, script_path, benchmarks_dir, out_dir, workers=4, timeout=300):
-    if not os.path.exists(shard_json):
-        print(f"[ERROR] Configuration shard file not found: {shard_json}")
+def execute_parallel_sweep(configs_json, gem5_bin, script_path, benchmarks_dir, out_dir, workers=4, timeout=300):
+    if not os.path.exists(configs_json):
+        print(f"[ERROR] Configuration file not found: {configs_json}")
         sys.exit(1)
         
-    with open(shard_json, 'r') as f:
+    with open(configs_json, 'r') as f:
         configs = json.load(f)
         
     print("=" * 110)
     print(f"   STARTING PARALLEL GEM5 SWEEP: {len(configs)} CONFIGURATIONS | WORKERS: {workers}")
-    print(f"   Configs Shard : {shard_json}")
+    print(f"   Configs File  : {configs_json}")
     print(f"   gem5 Binary   : {gem5_bin}")
     print(f"   Outputs Dir   : {out_dir}")
     print("=" * 110)
@@ -205,7 +205,7 @@ def execute_parallel_sweep(shard_json, gem5_bin, script_path, benchmarks_dir, ou
     
     manifest = {
         'environment_provenance': env_metadata,
-        'shard_file': shard_json,
+        'configs_file': configs_json,
         'total_configs': len(configs),
         'success_count': success_count,
         'failed_count': len(configs) - success_count,
@@ -227,7 +227,8 @@ def execute_parallel_sweep(shard_json, gem5_bin, script_path, benchmarks_dir, ou
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Parallel gem5 Simulation Sweep Runner")
-    parser.add_argument("--shard", type=str, required=True, help="Path to config shard JSON file")
+    parser.add_argument("--configs", "--shard", dest="configs", type=str, required=True,
+                        help="Path to sweep configs JSON file")
     parser.add_argument("--gem5", type=str, default="/home/ashrit/gem5/build/ARM/gem5.opt", help="gem5 binary path")
     parser.add_argument("--script", type=str, default="configs/arm_o3_parametric.py", help="gem5 python script")
     parser.add_argument("--benchmarks", type=str, default="benchmarks", help="Benchmarks directory")
@@ -236,4 +237,4 @@ if __name__ == '__main__':
     parser.add_argument("--timeout", type=int, default=300, help="Per-run watchdog timeout in seconds")
     args = parser.parse_args()
     
-    execute_parallel_sweep(args.shard, args.gem5, args.script, args.benchmarks, args.out_dir, args.workers, args.timeout)
+    execute_parallel_sweep(args.configs, args.gem5, args.script, args.benchmarks, args.out_dir, args.workers, args.timeout)

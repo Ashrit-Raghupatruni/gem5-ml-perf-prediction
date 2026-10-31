@@ -38,4 +38,4 @@ jobs:
 
       - name: Verify Decoupled Design Space Generator
         run: |
-          python scripts/generate_design_space.py --samples 40 --shards 2 --output-dir /tmp/test_configs
+          python scripts/generate_design_space.py --samples 40 --output-dir /tmp/test_configs

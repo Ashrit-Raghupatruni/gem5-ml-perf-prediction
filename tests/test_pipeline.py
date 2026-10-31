@@ -12,7 +12,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from scripts.generate_design_space import generate_lhs_design_space, save_and_split_shards, positive_int
+from scripts.generate_design_space import generate_lhs_design_space, save_configs, positive_int
 from scripts.parse_dataset import parse_single_stats, audit_simulation_manifests
 from ml.predict_and_screen import generate_candidate_design_space, compute_cost_and_energy_proxies, find_pareto_frontier
 from ml.train_models import build_preprocessor, get_model_candidates, get_feature_definitions
@@ -54,32 +54,24 @@ class TestDesignSpaceGenerator(unittest.TestCase):
         self.assertEqual(wls_102.count('quicksort'), 25)
         self.assertEqual(wls_102.count('hash'), 25)
 
-    def test_shard_partitioning_and_boundaries(self):
+    def test_save_configs_and_boundaries(self):
         """
-        Tests that shard sizes add up exactly to the total with no overlap or missing configs.
+        Tests that generated configs save properly to a single master file with exact count and no duplicate IDs.
         """
         for total in [100, 300, 501]:
             configs = generate_lhs_design_space(num_samples=total, seed=42, independent_widths=True)
             with tempfile.TemporaryDirectory() as tmp_dir:
-                save_and_split_shards(configs, tmp_dir, num_shards=3)
+                cfg_path = save_configs(configs, tmp_dir, filename="sweep_configs.json")
+                self.assertTrue(os.path.exists(cfg_path))
                 
-                s1_file = os.path.join(tmp_dir, "shards", "shard_1.json")
-                s2_file = os.path.join(tmp_dir, "shards", "shard_2.json")
-                s3_file = os.path.join(tmp_dir, "shards", "shard_3.json")
+                with open(cfg_path) as f:
+                    saved_configs = json.load(f)
                 
-                with open(s1_file) as f: s1 = json.load(f)
-                with open(s2_file) as f: s2 = json.load(f)
-                with open(s3_file) as f: s3 = json.load(f)
+                self.assertEqual(len(saved_configs), total)
                 
-                self.assertEqual(len(s1) + len(s2) + len(s3), total)
-                
-                # Check boundary disjointness
-                s1_ids = {c['config_id'] for c in s1}
-                s2_ids = {c['config_id'] for c in s2}
-                s3_ids = {c['config_id'] for c in s3}
-                self.assertTrue(s1_ids.isdisjoint(s2_ids))
-                self.assertTrue(s2_ids.isdisjoint(s3_ids))
-                self.assertTrue(s1_ids.isdisjoint(s3_ids))
+                # Check uniqueness of IDs
+                c_ids = [c['config_id'] for c in saved_configs]
+                self.assertEqual(len(c_ids), len(set(c_ids)))
 
     def test_invalid_sample_count_inputs(self):
         """

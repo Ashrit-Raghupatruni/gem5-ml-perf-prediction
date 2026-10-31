@@ -162,31 +162,16 @@ def generate_lhs_design_space(num_samples, seed=42, independent_widths=True):
     return all_configs
 
 
-def save_and_split_shards(configs, output_dir, num_shards=3):
+def save_configs(configs, output_dir, filename="sweep_configs.json"):
     """
-    Saves master configs JSON and splits configs across num_shards without dropping any configurations.
+    Saves master configs JSON to output_dir without shards.
     """
-    if num_shards <= 0:
-        raise ValueError(f"num_shards must be at least 1, got {num_shards}")
-        
     os.makedirs(output_dir, exist_ok=True)
-    master_path = os.path.join(output_dir, "sweep_configs.json")
+    master_path = os.path.join(output_dir, filename)
     with open(master_path, 'w') as f:
         json.dump(configs, f, indent=2)
-    print(f"[SUCCESS] Exported master sweep configs ({len(configs)} points) to: {master_path}")
-    
-    shards_dir = os.path.join(output_dir, "shards")
-    os.makedirs(shards_dir, exist_ok=True)
-    
-    total_configs = len(configs)
-    k, m = divmod(total_configs, num_shards)
-    shards = [configs[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(num_shards)]
-    
-    for i, shard_configs in enumerate(shards):
-        shard_path = os.path.join(shards_dir, f"shard_{i+1}.json")
-        with open(shard_path, 'w') as f:
-            json.dump(shard_configs, f, indent=2)
-        print(f"[SUCCESS] Exported Shard {i+1} ({len(shard_configs)} points) to: {shard_path}")
+    print(f"[SUCCESS] Exported sweep configs ({len(configs)} points) to: {master_path}")
+    return master_path
 
 
 def positive_int(value):
@@ -200,18 +185,18 @@ def positive_int(value):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="LHS Design Space Generator & Sharder with Decoupled Parameters")
+    parser = argparse.ArgumentParser(description="LHS Design Space Generator with Decoupled Parameters")
     parser.add_argument("--samples", type=positive_int, required=True,
-                        help="Total simulation sample points to generate (required positive integer, e.g. 180, 300, 500, 1000)")
-    parser.add_argument("--shards", type=positive_int, default=3,
-                        help="Number of team shards to split across laptops (default: 3)")
+                        help="Total simulation sample points to generate (required positive integer, e.g. 300, 500, 1000, 2000)")
     parser.add_argument("--seed", type=int, default=42,
                         help="Random seed for LHS sampling (default: 42)")
     parser.add_argument("--coupled", action="store_true",
                         help="Force coupled widths and proportional queues (legacy mode)")
     parser.add_argument("--output-dir", type=str, default="configs",
                         help="Directory to save config files (default: configs)")
+    parser.add_argument("--filename", type=str, default="sweep_configs.json",
+                        help="Filename for configs JSON (default: sweep_configs.json)")
     args = parser.parse_args()
     
     configs = generate_lhs_design_space(num_samples=args.samples, seed=args.seed, independent_widths=not args.coupled)
-    save_and_split_shards(configs, args.output_dir, num_shards=args.shards)
+    save_configs(configs, args.output_dir, filename=args.filename)

@@ -428,6 +428,18 @@ def validate_candidates(candidates_json, gem5_bin, script_path, benchmarks_dir, 
         json.dump(summary_report, f, indent=2)
     print("[INFO] Saved defensible validation summary to dataset/validation_summary.json")
 
+    # Also save copy in outputs/ directory
+    try:
+        os.makedirs("outputs", exist_ok=True)
+        with open("outputs/validation_summary.json", 'w') as f:
+            json.dump(summary_report, f, indent=2)
+        if os.path.exists(output_csv) and output_csv != "outputs/validation_results.csv":
+            import shutil
+            shutil.copy2(output_csv, "outputs/validation_results.csv")
+        print("[INFO] Saved copies of validation summary and results to outputs/")
+    except Exception as e:
+        print(f"[WARNING] Could not save output copies to outputs/: {e}")
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Ground-Truth Validation & Speedup Quantification Engine")

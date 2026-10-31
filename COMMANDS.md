@@ -22,7 +22,7 @@ pip install -r requirements.txt --break-system-packages
 
 ## 🧪 Step 0: Run Unit Tests & Sanity Check
 
-Runs the automated unit test suite verifying design space generation across arbitrary sample counts (e.g. 100, 180, 300, 501), remainder distribution, shard partitioning, stats parsing, and candidate screening:
+Runs the automated unit test suite verifying design space generation across arbitrary sample counts (e.g. 100, 180, 300, 501, 2000), remainder distribution, stats parsing, and candidate screening:
 
 ```bash
 python3 -m unittest discover tests -v
@@ -49,31 +49,30 @@ file benchmarks/*-arm
 
 ### Step 2: Generate the Design Space (Latin Hypercube Sampling)
 
-Generates a fully user-configurable number of Latin Hypercube Sampled configurations (e.g., 300, 500, or 1000) with independent parameter decoupling ($d=17$ orthogonal dimensions) and fair remainder distribution across workloads, and partitions them into team shards:
+Generates a fully user-configurable number of Latin Hypercube Sampled configurations (e.g., 300, 500, or 2000) with independent parameter decoupling ($d=17$ orthogonal dimensions) and fair remainder distribution across workloads into a single master sweep configuration:
 
 ```bash
-# Example A: 300 configurations (100 per shard for 3 team laptops)
-python3 scripts/generate_design_space.py --samples 300 --shards 3 --seed 42 --output-dir configs
+# Example A: 300 configurations (75 per workload)
+python3 scripts/generate_design_space.py --samples 300 --seed 42 --output-dir configs
 
-# Example B: 500 configurations (167 / 167 / 166 per shard)
-python3 scripts/generate_design_space.py --samples 500 --shards 3 --seed 42 --output-dir configs
+# Example B: 500 configurations (125 per workload)
+python3 scripts/generate_design_space.py --samples 500 --seed 42 --output-dir configs
 
-# Example C: 1000 configurations for large-scale exploration
-python3 scripts/generate_design_space.py --samples 1000 --shards 4 --seed 42 --output-dir configs
+# Example C: 2000 configurations for high-fidelity production exploration (500 per workload)
+python3 scripts/generate_design_space.py --samples 2000 --seed 42 --output-dir configs
 ```
 
 Outputs created:
 - `configs/sweep_configs.json` (Master configurations file matching the requested count)
-- `configs/shards/shard_*.json` (Fairly partitioned shard files with zero overlapping or missing designs)
 
 ---
 
 ### Step 3: Run the Parallel Simulation Sweep
 
-#### Option A: Running All Configurations on One Machine
+Runs the full design space sweep using parallel worker processes:
 ```bash
 python3 scripts/run_parallel_sweep.py \
-  --shard configs/sweep_configs.json \
+  --configs configs/sweep_configs.json \
   --gem5 /home/ashrit/gem5/build/ARM/gem5.opt \
   --script configs/arm_o3_parametric.py \
   --benchmarks benchmarks \
@@ -81,29 +80,14 @@ python3 scripts/run_parallel_sweep.py \
   --workers 4
 ```
 
-#### Option B: Running Shard 1 on Laptop 1 (Member A)
-```bash
-python3 scripts/run_parallel_sweep.py \
-  --shard configs/shards/shard_1.json \
-  --gem5 /home/ashrit/gem5/build/ARM/gem5.opt \
-  --script configs/arm_o3_parametric.py \
-  --benchmarks benchmarks \
-  --out-dir outputs/shard_1 \
-  --workers 4
-```
-
-*(On Laptop 2 for Member B: substitute `--shard configs/shards/shard_2.json --out-dir outputs/shard_2`)*  
-*(On Laptop 3 for Member C: substitute `--shard configs/shards/shard_3.json --out-dir outputs/shard_3`)*
-
-*Note: The runner validates that `stats.txt` exists and `simInsts > 0` before declaring success, and records wall-clock and aggregate core times into `simulation_manifest.json`.*
+*Note: The runner validates that `stats.txt` exists and `simInsts > 0` before declaring success, and records wall-clock and aggregate core times into `outputs/simulation_manifest.json`.*
 
 ---
 
-### Step 4: Harvest Stats & Build the Clean Dataset
+### Step 4: Harvest Stats & Build Clean Feature and Target Datasets
 
-Extracts cycle-accurate counters (`simInsts`, `ipc`, `l1d_mpki`, `l2_mpki`, `branch_mispred_rate`, `dram_total_reqs`) into a structured CSV file with strict validation and generates a quality report:
+Extracts cycle-accurate counters (`simInsts`, `ipc`, `l1d_mpki`, `l2_mpki`, `branch_mispred_rate`, `dram_total_reqs`) into structured CSV files with strict validation. It automatically generates the unified dataset as well as separate feature and output CSVs:
 
-#### If you ran all configurations on one machine:
 ```bash
 python3 scripts/parse_dataset.py \
   --configs configs/sweep_configs.json \
@@ -111,23 +95,16 @@ python3 scripts/parse_dataset.py \
   --output dataset/dataset_cleaned.csv
 ```
 
-#### If combining results from multiple team laptops:
-Place the output folders from all laptops into `outputs/` and run:
-```bash
-python3 scripts/parse_dataset.py \
-  --configs configs/sweep_configs.json \
-  --inputs outputs/shard_1 outputs/shard_2 outputs/shard_3 \
-  --output dataset/dataset_cleaned.csv
-```
-
 Outputs created:
-- `dataset/dataset_cleaned.csv`
-- `dataset/dataset_cleaned.csv.sha256` (Integrity checksum)
-- `dataset/dataset_quality_report.json` (Rejection and counter summary)
+- Unified dataset: `dataset/dataset_cleaned.csv` and integrity checksum `dataset/dataset_cleaned.csv.sha256`
+- Separated input features: `dataset/dataset_features.csv` and `outputs/features.csv` (19 features + `config_id`)
+- Separated target outputs: `dataset/dataset_outputs.csv` and `outputs/outputs.csv` (15 execution metrics + `config_id`)
+- Summary quality reports: `dataset/dataset_quality_report.json` and `outputs/dataset_quality_report.json`
 
 *Verification check:*
 ```bash
-head -n 5 dataset/dataset_cleaned.csv
+head -n 5 outputs/features.csv
+head -n 5 outputs/outputs.csv
 wc -l dataset/dataset_cleaned.csv
 ```
 
