@@ -80,7 +80,9 @@ python3 scripts/run_parallel_sweep.py \
   --workers 4
 ```
 
-*Note: The runner validates that `stats.txt` exists and `simInsts > 0` before declaring success, and records wall-clock and aggregate core times into `outputs/simulation_manifest.json`.*
+*Execution Details & Workers:*
+- `--workers 4`: Spawns 4 parallel concurrent worker processes executing gem5 simulations across CPU cores simultaneously. For an 8-core CPU, you can scale to `--workers 8` to accelerate sweep execution without oversubscribing the host.
+- The runner automatically verifies that `stats.txt` exists and `simInsts > 0` before recording completion in `outputs/simulation_manifest.json`.
 
 ---
 
@@ -112,7 +114,7 @@ wc -l outputs/features.csv outputs/outputs.csv dataset/dataset_cleaned.csv
 
 ### Step 5: Train, Cross-Validate & Evaluate Models
 
-Partitions data into 80% train and 20% untouched test split (stratified by workload). Evaluates KNN, Random Forest, and HistGradientBoosting under 5-Fold Cross-Validation, Leave-One-Workload-Out validation, computes 95% bootstrap confidence intervals, and permutation importance on the test set:
+Partitions data into 80% train and 20% untouched test split (stratified by workload). Evaluates the four core models (KNN, Random Forest, HistGradientBoosting, XGBoost) under 5-Fold Cross-Validation, Leave-One-Workload-Out validation, computes 95% bootstrap confidence intervals, and permutation importance on the test set:
 
 ```bash
 python3 ml/train_models.py \
