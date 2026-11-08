@@ -105,7 +105,7 @@ Outputs created:
 ```bash
 head -n 5 outputs/features.csv
 head -n 5 outputs/outputs.csv
-wc -l dataset/dataset_cleaned.csv
+wc -l outputs/features.csv outputs/outputs.csv dataset/dataset_cleaned.csv
 ```
 
 ---
@@ -183,8 +183,8 @@ python3 ml/validate_and_evaluate.py \
 ```
 
 Outputs created:
-- `dataset/validation_results.csv`
-- `dataset/validation_summary.json`
+- `dataset/validation_results.csv` and `outputs/validation_results.csv`
+- `dataset/validation_summary.json` and `outputs/validation_summary.json`
 - `visualizations/speedup_comparison.png`
 
 ---
@@ -193,6 +193,7 @@ Outputs created:
 
 ### Copy Generated Visualizations & Datasets to Windows File Explorer:
 ```bash
+cp -r outputs/* /mnt/c/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/outputs/
 cp -r visualizations/* /mnt/c/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/visualizations/
 cp -r dataset/* /mnt/c/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/dataset/
 cp -r ml/saved_models/* /mnt/c/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/ml/saved_models/
