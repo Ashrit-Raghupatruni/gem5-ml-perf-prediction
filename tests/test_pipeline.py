@@ -15,7 +15,7 @@ import pandas as pd
 from scripts.generate_design_space import generate_lhs_design_space, save_configs, positive_int
 from scripts.parse_dataset import parse_single_stats, audit_simulation_manifests
 from ml.predict_and_screen import generate_candidate_design_space, compute_cost_and_energy_proxies, find_pareto_frontier
-from ml.train_models import build_preprocessor, get_model_candidates, get_feature_definitions
+from ml.train_models import build_preprocessor, get_model_candidates, get_feature_definitions, engineer_microarchitectural_features
 from ml.validate_and_evaluate import evaluate_optimizer_performance
 from sklearn.pipeline import Pipeline
 
@@ -201,6 +201,39 @@ class TestCandidateScreeningAndPareto(unittest.TestCase):
 
 
 class TestSyntheticPipelineIntegration(unittest.TestCase):
+    
+    def test_feature_engineering_monotonicity(self):
+        """
+        Tests that engineered microarchitectural ratios are non-negative, finite, and strictly conform to physical bounds.
+        """
+        df_candidates = generate_candidate_design_space(num_candidates=50)
+        df_eng = engineer_microarchitectural_features(df_candidates)
+        
+        self.assertIn('pipe_issue_fetch_ratio', df_eng.columns)
+        self.assertIn('rob_to_issue_ratio', df_eng.columns)
+        self.assertIn('cache_l2_l1d_ratio', df_eng.columns)
+        self.assertIn('total_l1_cache_kb', df_eng.columns)
+        self.assertIn('peak_issue_bandwidth', df_eng.columns)
+        
+        # Check physical invariants
+        self.assertTrue((df_eng['pipe_issue_fetch_ratio'] > 0).all())
+        self.assertTrue((df_eng['pipe_issue_fetch_ratio'] <= 1.0).all())
+        self.assertTrue((df_eng['rob_to_issue_ratio'] >= 8.0).all())
+        self.assertTrue(np.isfinite(df_eng['cache_l2_l1d_ratio']).all())
+
+    def test_all_four_models_present(self):
+        """
+        Tests that exactly the required model suite (KNN, RandomForest, HistGradientBoosting, and optional XGBoost)
+        are instantiated with consistent interfaces.
+        """
+        models = get_model_candidates()
+        self.assertIn('KNN', models)
+        self.assertIn('RandomForest', models)
+        self.assertIn('HistGradientBoosting', models)
+        # Verify no unauthorized models (e.g. Ridge, SVR, etc.)
+        allowed = {'KNN', 'RandomForest', 'HistGradientBoosting', 'XGBoost'}
+        self.assertTrue(set(models.keys()).issubset(allowed))
+
     def test_synthetic_train_and_screen(self):
         cat_cols, num_cols = get_feature_definitions()
         all_features = cat_cols + num_cols
@@ -230,6 +263,7 @@ class TestSyntheticPipelineIntegration(unittest.TestCase):
             'ipc': np.random.uniform(0.5, 3.0, n_samples)
         }
         df_syn = pd.DataFrame(synthetic_data)
+        df_syn = engineer_microarchitectural_features(df_syn)
         
         candidates = get_model_candidates()
         self.assertIn('KNN', candidates)

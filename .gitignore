@@ -1,0 +1,5 @@
+# Ignore raw per-run simulation output directories (preserving CSV/JSON summaries)
+outputs/run_CFG_*
+outputs/validation_TOP_*
+__pycache__/
+*.pyc

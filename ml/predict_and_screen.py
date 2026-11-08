@@ -112,6 +112,29 @@ def generate_candidate_design_space(num_candidates=5000, workloads=None, seed=42
     return df_candidates
 
 
+
+def engineer_microarchitectural_features(df):
+    """
+    Derives dimensionless physical microarchitectural ratios and structural balance features.
+    """
+    df_out = df.copy()
+    fetch_w = np.maximum(df_out['fetch_width'], 1)
+    issue_w = np.maximum(df_out['issue_width'], 1)
+    rob_ent = np.maximum(df_out['rob_entries'], 1)
+    l1d_kb = np.maximum(df_out['l1d_size_kb'], 1)
+
+    df_out['pipe_issue_fetch_ratio'] = df_out['issue_width'] / fetch_w
+    df_out['pipe_commit_issue_ratio'] = df_out['commit_width'] / issue_w
+    df_out['rob_to_issue_ratio'] = df_out['rob_entries'] / issue_w
+    df_out['iq_to_rob_ratio'] = df_out['iq_entries'] / rob_ent
+    df_out['ls_to_rob_ratio'] = (df_out['lq_entries'] + df_out['sq_entries']) / rob_ent
+    df_out['phys_regs_to_rob_ratio'] = df_out['phys_int_regs'] / rob_ent
+    df_out['cache_l2_l1d_ratio'] = np.log2(df_out['l2_size_kb'] / l1d_kb)
+    df_out['total_l1_cache_kb'] = df_out['l1d_size_kb'] + df_out['l1i_size_kb']
+    df_out['peak_issue_bandwidth'] = df_out['fetch_width'] * df_out['clk_freq_ghz']
+    return df_out
+
+
 def compute_cost_and_energy_proxies(df):
     """
     Computes:
@@ -144,38 +167,54 @@ def compute_cost_and_energy_proxies(df):
 def predict_with_uncertainty(pipeline, df_features):
     """
     Computes mean prediction and calibrated epistemic uncertainty (std dev).
-    - If regressor is an ensemble with estimators_ (e.g. RandomForest, BaggingRegressor),
-      calculates predictive std dev across constituent estimators.
-    - If regressor is KNN (KNeighborsRegressor), computes distance-weighted or empirical
-      sample standard deviation of neighbor targets in feature space.
-    - If regressor is another model, computes local neighborhood variance or ensemble variance.
+    - Automatically checks and applies feature engineering if not already present.
+    - If regressor is RandomForest (with estimators_), calculates predictive std dev across trees.
+    - If regressor is XGBoost (with get_booster), calculates tree-staged boosting variance.
+    - If regressor is HistGradientBoosting, evaluates dispersion across staged boosting iterations.
+    - If regressor is KNN, computes empirical target dispersion among nearest neighbors.
     Never returns artificial constant zero.
     """
     regressor = pipeline.named_steps['regressor']
     preprocessor = pipeline.named_steps['preprocessor']
-    
-    X_trans = preprocessor.transform(df_features)
+
+    df_eval = df_features.copy()
+    if 'pipe_issue_fetch_ratio' not in df_eval.columns:
+        df_eval = engineer_microarchitectural_features(df_eval)
+
+    X_trans = preprocessor.transform(df_eval)
     mean_pred = regressor.predict(X_trans)
-    
+
     if hasattr(regressor, 'estimators_') and len(regressor.estimators_) > 0:
         tree_preds = np.array([tree.predict(X_trans) for tree in regressor.estimators_])
         std_pred = np.std(tree_preds, axis=0)
+    elif hasattr(regressor, 'get_booster'):
+        booster = regressor.get_booster()
+        n_trees = booster.num_boosted_rounds()
+        if n_trees > 10:
+            import xgboost as xgb
+            dmat = xgb.DMatrix(X_trans)
+            checkpoints = np.linspace(max(5, n_trees // 4), n_trees, 10, dtype=int)
+            staged = np.array([booster.predict(dmat, iteration_range=(0, int(cp))) for cp in checkpoints])
+            std_pred = np.std(staged, axis=0)
+        else:
+            std_pred = np.full_like(mean_pred, 0.03)
+    elif hasattr(regressor, 'staged_predict'):
+        stages = list(regressor.staged_predict(X_trans))
+        if len(stages) > 10:
+            sample_stages = stages[-15:]
+            std_pred = np.std(sample_stages, axis=0)
+        else:
+            std_pred = np.full_like(mean_pred, 0.03)
     elif hasattr(regressor, 'kneighbors'):
-        # For KNN: calculate empirical standard deviation among the k nearest training neighbors
-        # regressor._fit_X and regressor._y contain training representations
         distances, indices = regressor.kneighbors(X_trans)
         if hasattr(regressor, '_y'):
-            y_train_ref = regressor._y
-            neighbor_targets = y_train_ref[indices]
+            neighbor_targets = regressor._y[indices]
             std_pred = np.std(neighbor_targets, axis=1)
         else:
-            # Fallback to distance spread proxy
             std_pred = np.std(distances, axis=1)
     else:
-        # For non-ensemble/non-neighbor estimators, derive variance from residual uncertainty
-        std_pred = np.full_like(mean_pred, 0.05)
-        
-    # Ensure non-negative and finite
+        std_pred = np.full_like(mean_pred, 0.03)
+
     std_pred = np.nan_to_num(std_pred, nan=0.01)
     return mean_pred, std_pred
 

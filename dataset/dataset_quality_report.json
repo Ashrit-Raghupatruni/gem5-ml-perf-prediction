@@ -1,6 +1,6 @@
 {
-  "total_runs_scanned": 2000,
-  "valid_runs_harvested": 2000,
+  "total_runs_scanned": 5000,
+  "valid_runs_harvested": 5000,
   "duplicates_removed": 0,
   "missing_stats_count": 0,
   "invalid_stats_count": 0,
@@ -14,26 +14,26 @@
       "33c070f6f4b12e4e6ee781f3e2348c0b7f3980411b624da6c0e3544d4c35ecf7"
     ],
     "distinct_git_commits": [
-      "6198234c5c19ac5cd25f181f232e002339c672b9"
+      "4e8b646ead4e5c323cb9700f5ead5e1ab2b8f4a9"
     ],
     "is_gem5_build_homogeneous": true,
     "is_git_commit_homogeneous": true
   },
   "workload_distribution": {
-    "hash": 500,
-    "stream": 500,
-    "matmul": 500,
-    "quicksort": 500
+    "quicksort": 1250,
+    "matmul": 1250,
+    "hash": 1250,
+    "stream": 1250
   },
   "feature_summary": {
-    "ipc_min": 0.354209,
-    "ipc_max": 4.025583,
-    "ipc_mean": 1.118992483,
-    "ipc_std": 0.45050821474159886,
-    "cycles_min": 263418,
-    "cycles_max": 3347131,
+    "ipc_min": 0.223889,
+    "ipc_max": 3.934516,
+    "ipc_mean": 1.1184798992,
+    "ipc_std": 0.4451873034389275,
+    "cycles_min": 269515,
+    "cycles_max": 3866801,
     "sim_insts_min": 865654,
     "sim_insts_max": 2802108
   },
-  "sha256": "a464e15b0a48cc41d07074a2637f3f944b80ec1f8764a970c594e33d1f0245d9"
+  "sha256": "9904104462ff525d4bcd019b2a57b0895b32bee4c8051be97edfbb9eadc23f32"
 }

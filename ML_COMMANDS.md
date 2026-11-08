@@ -22,7 +22,7 @@ pip install -r requirements.txt --break-system-packages
 
 ## 🔬 1. Model Training & Cross-Validation (`ml/train_models.py`)
 
-Trains candidate regression models (Ridge, Random Forest, HistGradientBoosting) with:
+Trains the four core candidate regression models (KNN, Random Forest, HistGradientBoosting, XGBoost) with:
 - **80% Train / 20% Untouched Test split** (stratified by workload).
 - **5-Fold Cross-Validation** strictly on the train partition.
 - **GroupKFold (Leave-One-Workload-Out)** cross-validation to assess cross-workload generalization.

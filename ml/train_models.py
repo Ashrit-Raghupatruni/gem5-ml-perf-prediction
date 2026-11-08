@@ -26,6 +26,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.ensemble import RandomForestRegressor, HistGradientBoostingRegressor
 from sklearn.metrics import r2_score, mean_absolute_percentage_error, root_mean_squared_error, mean_absolute_error
+try:
+    import xgboost as xgb
+    HAS_XGBOOST = True
+except ImportError:
+    HAS_XGBOOST = False
 from sklearn.inspection import permutation_importance
 from scipy.stats import spearmanr
 import joblib
@@ -44,6 +49,31 @@ def print_execution_banner():
     print("=" * 110)
 
 
+
+def engineer_microarchitectural_features(df):
+    """
+    Derives dimensionless physical microarchitectural ratios and structural balance features.
+    Enables surrogate models to learn continuous architectural constraints rather than
+    relying solely on categorical workload identifiers.
+    """
+    df_out = df.copy()
+    fetch_w = np.maximum(df_out['fetch_width'], 1)
+    issue_w = np.maximum(df_out['issue_width'], 1)
+    rob_ent = np.maximum(df_out['rob_entries'], 1)
+    l1d_kb = np.maximum(df_out['l1d_size_kb'], 1)
+
+    df_out['pipe_issue_fetch_ratio'] = df_out['issue_width'] / fetch_w
+    df_out['pipe_commit_issue_ratio'] = df_out['commit_width'] / issue_w
+    df_out['rob_to_issue_ratio'] = df_out['rob_entries'] / issue_w
+    df_out['iq_to_rob_ratio'] = df_out['iq_entries'] / rob_ent
+    df_out['ls_to_rob_ratio'] = (df_out['lq_entries'] + df_out['sq_entries']) / rob_ent
+    df_out['phys_regs_to_rob_ratio'] = df_out['phys_int_regs'] / rob_ent
+    df_out['cache_l2_l1d_ratio'] = np.log2(df_out['l2_size_kb'] / l1d_kb)
+    df_out['total_l1_cache_kb'] = df_out['l1d_size_kb'] + df_out['l1i_size_kb']
+    df_out['peak_issue_bandwidth'] = df_out['fetch_width'] * df_out['clk_freq_ghz']
+    return df_out
+
+
 def get_feature_definitions():
     """
     Returns categorical and numerical feature names specified in documents/schema.md
@@ -56,7 +86,11 @@ def get_feature_definitions():
         'l1d_size_kb', 'l1d_assoc',
         'l1i_size_kb', 'l1i_assoc',
         'l2_size_kb', 'l2_assoc',
-        'clk_freq_ghz'
+        'clk_freq_ghz',
+        'pipe_issue_fetch_ratio', 'pipe_commit_issue_ratio',
+        'rob_to_issue_ratio', 'iq_to_rob_ratio', 'ls_to_rob_ratio',
+        'phys_regs_to_rob_ratio', 'cache_l2_l1d_ratio',
+        'total_l1_cache_kb', 'peak_issue_bandwidth'
     ]
     return categorical_features, numerical_features
 
@@ -75,10 +109,35 @@ def build_preprocessor():
 
 def get_model_candidates():
     models = {
-        'KNN': KNeighborsRegressor(n_neighbors=5, weights='distance'),
-        'RandomForest': RandomForestRegressor(n_estimators=200, max_depth=12, random_state=42, n_jobs=-1),
-        'HistGradientBoosting': HistGradientBoostingRegressor(max_iter=250, learning_rate=0.08, min_samples_leaf=5, random_state=42)
+        'KNN': KNeighborsRegressor(n_neighbors=7, weights='distance'),
+        'RandomForest': RandomForestRegressor(
+            n_estimators=300,
+            max_depth=16,
+            min_samples_leaf=2,
+            max_features=None,
+            random_state=42,
+            n_jobs=-1
+        ),
+        'HistGradientBoosting': HistGradientBoostingRegressor(
+            max_iter=300,
+            learning_rate=0.06,
+            min_samples_leaf=8,
+            l2_regularization=0.1,
+            random_state=42
+        )
     }
+    if HAS_XGBOOST:
+        models['XGBoost'] = xgb.XGBRegressor(
+            n_estimators=300,
+            max_depth=6,
+            learning_rate=0.05,
+            subsample=0.85,
+            colsample_bytree=0.85,
+            reg_alpha=0.05,
+            reg_lambda=0.5,
+            random_state=42,
+            n_jobs=-1
+        )
     return models
 
 
@@ -179,7 +238,7 @@ def evaluate_grouped_cross_validation(X, y, groups):
         preprocessor = build_preprocessor()
         pipeline = Pipeline([
             ('preprocessor', preprocessor),
-            ('regressor', RandomForestRegressor(n_estimators=150, max_depth=12, random_state=42, n_jobs=-1))
+            ('regressor', RandomForestRegressor(n_estimators=250, max_depth=16, min_samples_leaf=2, max_features=None, random_state=42, n_jobs=-1))
         ])
         
         pipeline.fit(X_tr, y_tr)
@@ -328,8 +387,11 @@ def train_and_export(dataset_path, output_model_dir, target_metric='ipc'):
     df = pd.read_csv(dataset_path)
     print(f"[INFO] Successfully loaded dataset: {len(df)} samples, {len(df.columns)} columns.")
     
+    # Automatic feature engineering on dataset
+    df = engineer_microarchitectural_features(df)
     categorical_features, numerical_features = get_feature_definitions()
     all_features = categorical_features + numerical_features
+    
     missing_cols = [c for c in all_features if c not in df.columns]
     if missing_cols:
         print(f"[ERROR] Missing required feature columns in dataset: {missing_cols}")

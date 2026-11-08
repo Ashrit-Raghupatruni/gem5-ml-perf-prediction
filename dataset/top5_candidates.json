@@ -23,45 +23,45 @@
       "clk_freq_ghz": 2.4
     },
     "predicted_metrics": {
-      "predicted_ipc": 0.9553615354195578,
-      "uncertainty_std": 0.05,
-      "ucb_ipc": 1.0303615354195579
+      "predicted_ipc": 0.9534904397336504,
+      "uncertainty_std": 5.220153764896257e-05,
+      "ucb_ipc": 0.9535687420401239
     },
     "hardware_cost_proxy": 14.400000000000002,
     "power_proxy": 14.45583288005226,
-    "energy_proxy": 15.131269518511457
+    "energy_proxy": 15.160962583002274
   },
   {
     "candidate_id": "TOP_02",
     "workload": "matmul",
     "params": {
-      "fetch_width": 4,
+      "fetch_width": 2,
       "decode_width": 2,
       "issue_width": 2,
       "commit_width": 2,
       "rob_entries": 64,
-      "iq_entries": 46,
-      "lq_entries": 18,
-      "sq_entries": 18,
-      "phys_int_regs": 134,
-      "phys_fp_regs": 134,
+      "iq_entries": 51,
+      "lq_entries": 16,
+      "sq_entries": 22,
+      "phys_int_regs": 132,
+      "phys_fp_regs": 132,
       "branch_predictor": "BiModeBP",
       "l1d_size_kb": 32,
-      "l1d_assoc": 2,
-      "l1i_size_kb": 64,
-      "l1i_assoc": 4,
-      "l2_size_kb": 512,
-      "l2_assoc": 8,
+      "l1d_assoc": 8,
+      "l1i_size_kb": 32,
+      "l1i_assoc": 8,
+      "l2_size_kb": 1024,
+      "l2_assoc": 4,
       "clk_freq_ghz": 1.5
     },
     "predicted_metrics": {
-      "predicted_ipc": 1.429009558333188,
-      "uncertainty_std": 0.05,
-      "ucb_ipc": 1.504009558333188
+      "predicted_ipc": 1.4282826352657407,
+      "uncertainty_std": 0.00022915588144973822,
+      "ucb_ipc": 1.4286263690879153
     },
-    "hardware_cost_proxy": 18.0,
-    "power_proxy": 5.015330248348557,
-    "energy_proxy": 3.5096547948905896
+    "hardware_cost_proxy": 17.2,
+    "power_proxy": 4.4641950562223425,
+    "energy_proxy": 3.1255683896148128
   },
   {
     "candidate_id": "TOP_03",
@@ -87,45 +87,45 @@
       "clk_freq_ghz": 1.5
     },
     "predicted_metrics": {
-      "predicted_ipc": 2.5357540239990857,
-      "uncertainty_std": 0.05,
-      "ucb_ipc": 2.610754023999086
+      "predicted_ipc": 2.5201818717009754,
+      "uncertainty_std": 0.00029798304882942426,
+      "ucb_ipc": 2.5206288462742195
     },
     "hardware_cost_proxy": 20.4,
     "power_proxy": 5.290897844411664,
-    "energy_proxy": 2.086518563842205
+    "energy_proxy": 2.099411119420765
   },
   {
     "candidate_id": "TOP_04",
     "workload": "matmul",
     "params": {
-      "fetch_width": 4,
-      "decode_width": 4,
-      "issue_width": 4,
-      "commit_width": 4,
-      "rob_entries": 192,
-      "iq_entries": 34,
-      "lq_entries": 62,
-      "sq_entries": 59,
-      "phys_int_regs": 170,
-      "phys_fp_regs": 170,
-      "branch_predictor": "TournamentBP",
-      "l1d_size_kb": 32,
-      "l1d_assoc": 8,
-      "l1i_size_kb": 32,
-      "l1i_assoc": 8,
-      "l2_size_kb": 1024,
+      "fetch_width": 8,
+      "decode_width": 8,
+      "issue_width": 8,
+      "commit_width": 8,
+      "rob_entries": 96,
+      "iq_entries": 69,
+      "lq_entries": 38,
+      "sq_entries": 36,
+      "phys_int_regs": 134,
+      "phys_fp_regs": 134,
+      "branch_predictor": "BiModeBP",
+      "l1d_size_kb": 16,
+      "l1d_assoc": 2,
+      "l1i_size_kb": 16,
+      "l1i_assoc": 2,
+      "l2_size_kb": 256,
       "l2_assoc": 4,
-      "clk_freq_ghz": 1.5
+      "clk_freq_ghz": 3.0
     },
     "predicted_metrics": {
-      "predicted_ipc": 2.717502496274104,
-      "uncertainty_std": 0.05,
-      "ucb_ipc": 2.7925024962741043
+      "predicted_ipc": 3.250640822688617,
+      "uncertainty_std": 0.0001860731285112368,
+      "ucb_ipc": 3.2509199323813838
     },
-    "hardware_cost_proxy": 27.6,
-    "power_proxy": 7.0545304592155516,
-    "energy_proxy": 2.595960985827182
+    "hardware_cost_proxy": 27.999999999999996,
+    "power_proxy": 41.777065478561326,
+    "energy_proxy": 12.851947587370592
   },
   {
     "candidate_id": "TOP_05",
@@ -136,27 +136,27 @@
       "issue_width": 8,
       "commit_width": 8,
       "rob_entries": 256,
-      "iq_entries": 72,
-      "lq_entries": 35,
-      "sq_entries": 46,
-      "phys_int_regs": 169,
-      "phys_fp_regs": 169,
-      "branch_predictor": "BiModeBP",
+      "iq_entries": 56,
+      "lq_entries": 31,
+      "sq_entries": 61,
+      "phys_int_regs": 201,
+      "phys_fp_regs": 201,
+      "branch_predictor": "TournamentBP",
       "l1d_size_kb": 32,
-      "l1d_assoc": 4,
-      "l1i_size_kb": 32,
-      "l1i_assoc": 4,
-      "l2_size_kb": 512,
-      "l2_assoc": 8,
+      "l1d_assoc": 2,
+      "l1i_size_kb": 64,
+      "l1i_assoc": 2,
+      "l2_size_kb": 256,
+      "l2_assoc": 16,
       "clk_freq_ghz": 1.5
     },
     "predicted_metrics": {
-      "predicted_ipc": 3.646613885962225,
-      "uncertainty_std": 0.05,
-      "ucb_ipc": 3.721613885962225
+      "predicted_ipc": 3.827874943521284,
+      "uncertainty_std": 0.00019324392091697195,
+      "ucb_ipc": 3.8281648094026597
     },
-    "hardware_cost_proxy": 37.99999999999999,
+    "hardware_cost_proxy": 38.0,
     "power_proxy": 9.589752342996142,
-    "energy_proxy": 2.6297690523014374
+    "energy_proxy": 2.50524180765803
   }
 ]
