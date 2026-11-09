@@ -314,12 +314,26 @@ def screen_candidates(model_path, num_candidates=5000, top_k=5, kappa=1.5, outpu
     
     df_evaluated = find_pareto_frontier(df_candidates, cost_col='hardware_cost_proxy', perf_col='predicted_ipc')
     
-    pareto_candidates = df_evaluated[df_evaluated['is_pareto']].copy()
-    if len(pareto_candidates) < top_k:
-        selected_candidates = df_evaluated.sort_values(by='predicted_ipc', ascending=False).head(top_k)
-    else:
-        indices = np.linspace(0, len(pareto_candidates) - 1, top_k, dtype=int)
-        selected_candidates = pareto_candidates.iloc[indices]
+    # Stratified multi-objective candidate selection:
+    # Select non-dominated Pareto configurations across all 4 benchmark suites to ensure workload coverage
+    workloads = ['matmul', 'stream', 'quicksort', 'hash']
+    per_wl_k = max(1, top_k // len(workloads))
+    remainder = top_k % len(workloads)
+    
+    selected_subsets = []
+    for idx_w, wl in enumerate(workloads):
+        target_count = per_wl_k + (1 if idx_w < remainder else 0)
+        wl_df = df_candidates[df_candidates['workload'] == wl].copy()
+        wl_pareto = find_pareto_frontier(wl_df, cost_col='hardware_cost_proxy', perf_col='predicted_ipc')
+        pts = wl_pareto[wl_pareto['is_pareto']]
+        if len(pts) < target_count:
+            chosen = wl_df.sort_values(by='predicted_ipc', ascending=False).head(target_count)
+        else:
+            indices = np.linspace(0, len(pts) - 1, target_count, dtype=int)
+            chosen = pts.iloc[indices]
+        selected_subsets.append(chosen)
+        
+    selected_candidates = pd.concat(selected_subsets, ignore_index=True)
         
     print("\n" + "=" * 135)
     print(f"      TOP-{top_k} PREDICTED PARETO-OPTIMAL CONFIGURATIONS FOR GEM5 VALIDATION")

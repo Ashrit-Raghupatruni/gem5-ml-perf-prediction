@@ -23,15 +23,17 @@ except ModuleNotFoundError:
     from predict_and_screen import generate_candidate_design_space, predict_with_uncertainty
 
 
-def select_active_learning_queries(model_path, pool_size=2000, n_queries=15, strategy='uncertainty', output_json="configs/active_queries.json"):
+def select_active_learning_queries(model_path, pool_size=2000, n_queries=16, strategy='uncertainty', output_json="configs/active_queries.json"):
     """
     Selects the most informative microarchitectural configurations from an unlabeled candidate pool
     to run through gem5 simulation, maximizing model improvement with minimal simulation budget.
     
-    Strategies:
-    - 'uncertainty': Maximize predictive variance (std dev across ensemble trees)
-    - 'ucb': Upper Confidence Bound (exploration + exploitation: mu + 1.5 * sigma)
-    - 'random': Baseline random sampling
+    Hardened Active Learning Guarantees:
+    - Balanced Workload Coverage: Enforces equal allocation across all 4 benchmark suites
+      (matmul, stream, quicksort, hash) preventing query starvation of low-variance workloads.
+    - Diversity & Non-Redundancy: Applies furthest-first Euclidean distance filtering in normalized
+      microarchitectural feature space to reject clustered/duplicate configurations.
+    - Uncertainty Calibration: Uses residual-calibrated standard deviation.
     """
     if not os.path.exists(model_path):
         print(f"[ERROR] Trained model pipeline not found: {model_path}")
@@ -49,16 +51,49 @@ def select_active_learning_queries(model_path, pool_size=2000, n_queries=15, str
     df_pool['uncertainty_std'] = std_preds
     df_pool['ucb'] = mean_preds + (1.5 * std_preds)
     
-    if strategy == 'uncertainty':
-        print(f"[INFO] Selecting top {n_queries} designs with highest predictive uncertainty (variance)...")
-        selected_df = df_pool.sort_values(by='uncertainty_std', ascending=False).head(n_queries).copy()
-    elif strategy == 'ucb':
-        print(f"[INFO] Selecting top {n_queries} designs maximizing Upper Confidence Bound (UCB)...")
-        selected_df = df_pool.sort_values(by='ucb', ascending=False).head(n_queries).copy()
-    else:
-        print(f"[INFO] Selecting {n_queries} random designs...")
-        selected_df = df_pool.sample(n=n_queries, random_state=42).copy()
+    workloads = ['matmul', 'stream', 'quicksort', 'hash']
+    queries_per_wl = max(1, n_queries // len(workloads))
+    remainder = n_queries % len(workloads)
+    
+    selected_subsets = []
+    
+    for idx_w, wl in enumerate(workloads):
+        wl_count = queries_per_wl + (1 if idx_w < remainder else 0)
+        wl_pool = df_pool[df_pool['workload'] == wl].copy()
         
+        if strategy == 'uncertainty':
+            # Sort by uncertainty descending
+            sorted_candidates = wl_pool.sort_values(by='uncertainty_std', ascending=False)
+        elif strategy == 'ucb':
+            sorted_candidates = wl_pool.sort_values(by='ucb', ascending=False)
+        else:
+            sorted_candidates = wl_pool.sample(frac=1.0, random_state=42)
+            
+        # Feature diversity filter (furthest-first in key normalized microarchitectural params)
+        num_keys = ['fetch_width', 'rob_entries', 'l1d_size_kb', 'l2_size_kb', 'clk_freq_ghz']
+        pts = sorted_candidates[num_keys].values.astype(float)
+        # Normalize features
+        pt_min = pts.min(axis=0)
+        pt_ptp = np.ptp(pts, axis=0)
+        pt_ptp[pt_ptp == 0] = 1.0
+        norm_pts = (pts - pt_min) / pt_ptp
+        
+        chosen_indices = []
+        for cand_idx in range(len(sorted_candidates)):
+            if len(chosen_indices) >= wl_count:
+                break
+            if not chosen_indices:
+                chosen_indices.append(cand_idx)
+            else:
+                # Minimum distance to already chosen candidates
+                dists = np.min([np.linalg.norm(norm_pts[cand_idx] - norm_pts[ci]) for ci in chosen_indices])
+                # Ensure distinct configurations (diversity threshold > 0.15)
+                if dists > 0.15 or len(chosen_indices) + (len(sorted_candidates) - cand_idx) <= wl_count:
+                    chosen_indices.append(cand_idx)
+                    
+        selected_subsets.append(sorted_candidates.iloc[chosen_indices])
+        
+    selected_df = pd.concat(selected_subsets, ignore_index=True)
     queries = []
     print("\n" + "=" * 115)
     print(f"      ACTIVE LEARNING QUERIES FOR ADAPTIVE GEM5 SAMPLING (Strategy: {strategy.upper()})")

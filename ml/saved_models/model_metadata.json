@@ -40,6 +40,7 @@
   },
   "grouped_cross_workload_cv": {
     "mean_r2": -944.8018970260742,
+    "variance_weighted_r2": -2.6399545919920224,
     "mean_mae": 0.4278496152602687,
     "mean_mape": 40.57755470250846,
     "mean_rmse": 0.5361182745094962,
@@ -142,5 +143,5 @@
     "total_l1_cache_kb",
     "peak_issue_bandwidth"
   ],
-  "training_timestamp": "2026-11-08 06:54:11 UTC"
+  "training_timestamp": "2026-11-09 05:04:54 UTC"
 }

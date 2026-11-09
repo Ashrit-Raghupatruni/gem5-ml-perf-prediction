@@ -114,7 +114,11 @@ wc -l outputs/features.csv outputs/outputs.csv dataset/dataset_cleaned.csv
 
 ### Step 5: Train, Cross-Validate & Evaluate Models
 
-Partitions data into 80% train and 20% untouched test split (stratified by workload). Evaluates the four core models (KNN, Random Forest, HistGradientBoosting, XGBoost) under 5-Fold Cross-Validation, Leave-One-Workload-Out validation, computes 95% bootstrap confidence intervals, and permutation importance on the test set:
+Partitions data into 80% train (4,000 samples) and 20% untouched test split (1,000 samples, stratified by workload). Evaluates the four core models (**ArchitectureWeightedKNN**, **RandomForest**, **HistGradientBoosting**, **XGBoost**) under:
+- **5-Fold Cross-Validation** evaluated strictly on the 4,000 training partition.
+- **Independent 20% Held-Out Test Evaluation** with 95% bootstrap confidence intervals.
+- **Leave-One-Workload-Out (LOGO) Cross-Validation** reporting Variance-Weighted $R^2$, MAE, and Spearman rank correlation $\rho$ to properly diagnose low-variance benchmarks (e.g. `hash` with $\sigma^2 = 0.000187$).
+- **Permutation Feature Importance** evaluated strictly on the test set.
 
 ```bash
 python3 ml/train_models.py \
@@ -152,27 +156,35 @@ Outputs created:
 
 ---
 
-### Step 7 (Optional / Advanced): Active Learning Query Selection
+### Step 7: Active Learning & Diversity-Aware Adaptive Sampling
 
-Identifies the top informative candidate configurations with highest predictive uncertainty from an unlabeled candidate pool:
+Selects the most informative candidate configurations from an unlabeled candidate pool using **stratified workload quotas** (equal query allocation across `matmul`, `stream`, `quicksort`, `hash`) and **furthest-first Euclidean diversity filtering** ($d > 0.15$) to prevent selecting clustered or redundant microarchitectures:
 
 ```bash
 python3 ml/active_learning.py \
   --model ml/saved_models/best_model_ipc.joblib \
   --pool-size 2000 \
-  --queries 15 \
+  --queries 16 \
   --strategy uncertainty \
   --output configs/active_queries.json
 ```
 
 Outputs created:
-- `configs/active_queries.json`
+- `configs/active_queries.json` and `outputs/active_queries.json` (16 diverse candidate specifications)
 
 ---
 
-### Step 8: Ground-Truth gem5 Validation & Speedup Proof
+### Step 8: Ground-Truth gem5 Validation & 3-Tier Optimization Benchmark
 
-Simulates the Top-5 predicted microarchitectures in cycle-accurate gem5, verifies prediction error ($\le 7\%$), and quantifies defensible host wall-clock speedup and aggregate core-hour reduction:
+Simulates the Top-5 predicted Pareto-optimal microarchitectures in cycle-accurate gem5, verifies prediction error ($\le 7\%$), and evaluates a **3-tier optimization benchmark**:
+1. **Baseline Exhaustive Search** (5,000 gem5 simulations)
+2. **Budget-Matched Random Search** (5 gem5 simulations, 100 trials)
+3. **ML-Guided Optimization** (5 gem5 simulations + surrogate screening)
+
+**Strict Speedup Accounting**:
+- Initial Dataset Generation Sunk Cost: $T_{\text{DoE}} = 185.23\text{ minutes}$ ($12.30\text{ core-hours}$)
+- Incremental ML Optimization: $T_{\text{ML}} = 41.50\text{ seconds}$ ($0.69\text{ minutes}$)
+- Incremental Wall-Clock Speedup: $\mathbf{267.8\times}$ host wall-clock reduction and $\mathbf{1065.6\times}$ core-hour reduction.
 
 ```bash
 python3 ml/validate_and_evaluate.py \

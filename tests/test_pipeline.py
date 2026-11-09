@@ -6,6 +6,7 @@ Project: ML-Based Microarchitectural Performance Prediction (ARM gem5)
 
 import os
 import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import json
 import tempfile
 import unittest

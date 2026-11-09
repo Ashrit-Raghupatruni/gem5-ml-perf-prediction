@@ -71,16 +71,18 @@ python3 ml/predict_and_screen.py \
 
 ---
 
-## 🎯 3. Active Learning & Adaptive Sampling (`ml/active_learning.py`)
+## 🎯 3. Active Learning & Diversity-Aware Adaptive Sampling (`ml/active_learning.py`)
 
 Queries an unlabeled pool of candidate configurations to identify the most informative designs for the next iteration of gem5 simulations:
+- **Workload Quota**: Enforces equal query allocation across all 4 workloads (`matmul`, `stream`, `quicksort`, `hash`).
+- **Furthest-First Diversity Filter**: Applies normalized feature-space Euclidean gating ($d > 0.15$) to prevent clustering identical CPU configurations.
 - Strategy options: `uncertainty` (maximum predictive variance), `ucb` (upper confidence bound), or `random`.
 
 ```bash
 python3 ml/active_learning.py \
   --model ml/saved_models/best_model_ipc.joblib \
   --pool-size 2000 \
-  --queries 15 \
+  --queries 16 \
   --strategy uncertainty \
   --output configs/active_queries.json
 ```

@@ -26,6 +26,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.ensemble import RandomForestRegressor, HistGradientBoostingRegressor
 from sklearn.metrics import r2_score, mean_absolute_percentage_error, root_mean_squared_error, mean_absolute_error
+from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.utils.validation import check_is_fitted
 try:
     import xgboost as xgb
     HAS_XGBOOST = True
@@ -107,9 +109,52 @@ def build_preprocessor():
     return preprocessor
 
 
+
+class ArchitectureWeightedKNN(BaseEstimator, RegressorMixin):
+    """
+    Domain-Weighted K-Nearest Neighbors for Microarchitectural Spaces.
+    Weights primary performance bottleneck drivers (issue width, fetch width,
+    L2 cache, frequency, peak issue bandwidth) to overcome uniform Euclidean
+    distance distortion in high-dimensional mixed-feature spaces.
+    """
+    def __init__(self, n_neighbors=5, weights='distance'):
+        self.n_neighbors = n_neighbors
+        self.weights = weights
+
+    def _apply_weights(self, X):
+        X_w = np.array(X, dtype=float).copy()
+        if X_w.shape[1] >= 31:
+            # 0,1,2: workload categorical
+            X_w[:, 0:3] *= 4.0
+            # 5: fetch_width, 7: issue_width, 19: l2_size_kb, 21: clk_freq_ghz, 30: peak_issue_bandwidth
+            X_w[:, 5] *= 2.0
+            X_w[:, 7] *= 3.5
+            X_w[:, 19] *= 2.5
+            X_w[:, 21] *= 2.0
+            X_w[:, 30] *= 2.5
+        return X_w
+
+    def fit(self, X, y):
+        self.knn_ = KNeighborsRegressor(n_neighbors=self.n_neighbors, weights=self.weights)
+        X_w = self._apply_weights(X)
+        self.knn_.fit(X_w, y)
+        self._y_ = np.array(y)
+        self.is_fitted_ = True
+        return self
+
+    def predict(self, X):
+        check_is_fitted(self, 'is_fitted_')
+        X_w = self._apply_weights(X)
+        return self.knn_.predict(X_w)
+
+    def kneighbors(self, X=None, n_neighbors=None, return_distance=True):
+        check_is_fitted(self, 'is_fitted_')
+        X_w = self._apply_weights(X) if X is not None else None
+        return self.knn_.kneighbors(X_w, n_neighbors=n_neighbors, return_distance=return_distance)
+
 def get_model_candidates():
     models = {
-        'KNN': KNeighborsRegressor(n_neighbors=7, weights='distance'),
+        'KNN': ArchitectureWeightedKNN(n_neighbors=5, weights='distance'),
         'RandomForest': RandomForestRegressor(
             n_estimators=300,
             max_depth=16,
@@ -265,8 +310,14 @@ def evaluate_grouped_cross_validation(X, y, groups):
         print(f"{held_out_wl:<18} | {r2:<10.4f} | {mae:<8.4f} | {mape:<9.2f}% | {rmse:<8.4f} | {target_var:<10.6f} | {rho:<8.4f}")
         
     print("-" * 88)
+    variances = [res['target_variance'] for res in group_results.values()]
+    sum_var = sum(variances) if sum(variances) > 0 else 1.0
+    var_weights = np.array(variances) / sum_var
+    variance_weighted_r2 = float(np.sum(var_weights * np.array(r2_list)))
+
     mean_summary = {
         'mean_r2': float(np.mean(r2_list)),
+        'variance_weighted_r2': variance_weighted_r2,
         'mean_mae': float(np.mean(mae_list)),
         'mean_mape': float(np.mean(mape_list)),
         'mean_rmse': float(np.mean(rmse_list)),
@@ -279,6 +330,7 @@ def evaluate_grouped_cross_validation(X, y, groups):
         )
     }
     print(f"{'Mean Cross-Workload':<18} | {mean_summary['mean_r2']:<10.4f} | {mean_summary['mean_mae']:<8.4f} | {mean_summary['mean_mape']:<9.2f}% | {mean_summary['mean_rmse']:<8.4f} | {'N/A':<10} | {mean_summary['mean_spearman']:<8.4f}")
+    print(f"   [DIAGNOSTIC] Variance-Weighted LOGO R2: {variance_weighted_r2:.4f} (Accounts for low-variance targets like hash)")
     return mean_summary
 
 
