@@ -368,9 +368,18 @@ python3 ml/predict_custom.py \
 
 ---
 
-### Step 9: Interactive Web Dashboard & Real-Time Explorer
+### Step 9: Interactive Research Platform & Web UI
 
-Launch the real-time design explorer and REST API backend:
+Launch the comprehensive microarchitectural research platform (matching our 5-panel layout with view-only dataset exploration, Top-5 validation vs cycle-level ground truth, 4-model benchmarking, 4 core publication plots, active learning queries with epistemic uncertainty, and custom parameter inference):
+
+\\ash
+python3 run_ui.py --host 127.0.0.1 --port 8000
+\
+- **Dashboard Overview**: Direct view of Dataset metrics (20 inputs, 16 outputs), Top-5 Pareto ground-truth validation vs. gem5 simulation, 4-model comparison suite, and 15 uncertainty-based Active Learning queries.
+- **Dataset Explorer**: In-browser search & inspect for 5,000 samples (View-Only mode without download button).
+- **Visualizations Gallery**: Interactive zoom lightbox for all 4 core evaluation figures (Feature Importance, Pareto Frontier, Predicted vs Actual, and Speedup Comparison).
+- **Active Learning Suite**: High-uncertainty candidate configurations identified for adaptive gem5 screening.
+- **Custom Predictor**: Real-time interactive sliders and radar chart for on-the-fly microarchitectural performance evaluation.
 
 \\ash
 python3 run_ui.py --host 127.0.0.1 --port 8000

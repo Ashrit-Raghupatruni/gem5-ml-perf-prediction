@@ -168,14 +168,23 @@ cp -r visualizations/* /mnt/c/Users/ashri/Documents/antigravity/dazzling-pythago
 
 ---
 
-## 6. Interactive Web Dashboard & REST Service
+## 6. Interactive Research Platform & Web UI
 
-Launch the FastAPI backend serving both the REST prediction endpoints and the interactive dark-mode microarchitectural dashboard:
+Launch the FastAPI backend serving the complete multi-page research platform:
 
 \\ash
 python3 run_ui.py --host 127.0.0.1 --port 8000
 \
-- **REST Endpoint**: \POST /api/predict\ for JSON microarchitecture configurations.
-- **Batch CSV Endpoint**: \POST /api/batch-predict\ with multi-objective Pareto frontier identification.
-- **Interactive UI**: Real-time pipeline sliders, uncertainty bounds, physical area/power/energy gauges, and dimensionless ratio radar plots.
-
+- **REST Endpoints**:
+  - \POST /api/predict\: Single design inference with uncertainty & physical cost proxies.
+  - \POST /api/batch-predict\: Batch CSV inference with non-dominated Pareto identification.
+  - \GET /api/dataset/view\: View-only tabular inspection of input features and output targets.
+  - \GET /api/validation/top5\: Top-5 candidate predictions vs. cycle-level gem5 ground truth.
+  - \GET /api/models/metrics\: 4-model evaluation metrics (5-fold CV & held-out test split).
+  - \GET /api/active-learning/queries\: 15 queries selected by active learning uncertainty.
+- **Frontend Pages**:
+  - \Dashboard Overview\: 5-panel layout with dataset preview, Top-5 validation, models metrics, 4 core plots, and active learning queries.
+  - \Dataset Explorer\: View-only data grid with real-time text filter.
+  - \Visualizations\: Full gallery with click-to-zoom modal for publication plots.
+  - \Active Learning\: Detailed 15-candidate table with epistemic variance.
+  - \Custom Predictor\: Live parameter sliders and radar chart.

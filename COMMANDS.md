@@ -232,15 +232,19 @@ python3 ml/predict_custom.py \
 
 ---
 
-### Step 10: Launch Interactive Web Dashboard & REST API
+### Step 10: Launch Interactive Research Platform & Web UI
 
-Launch the real-time interactive microarchitectural design explorer UI:
+Launch the complete microarchitectural research dashboard and REST API service:
 
 \\ash
 python3 run_ui.py --host 127.0.0.1 --port 8000
 \
-- Open in browser: \http://localhost:8000- Interactive Swagger/OpenAPI docs: \http://localhost:8000/docs- Features real-time parameter sliders, epistemic uncertainty bars, physical cost proxies (Area, Power, Energy), microarchitectural balance radar charts, and batch CSV drag-and-drop with Pareto frontier screening.
-``
+- **URL**: \http://127.0.0.1:8000- **OpenAPI / Swagger**: \http://127.0.0.1:8000/docs- **Features Included**:
+  1. **Dashboard Overview**: Summary of Dataset (20 inputs, 16 outputs), Top-5 Pareto ground-truth validation vs. gem5 simulation, 4-model evaluation, and 15 uncertainty-based Active Learning queries.
+  2. **Dataset Explorer**: In-browser search & inspect for 5,000 samples (View-Only mode without download button).
+  3. **Visualizations Gallery**: Interactive zoom lightbox for all 4 core evaluation figures (Feature Importance, Pareto Frontier, Predicted vs Actual, and Speedup Comparison).
+  4. **Active Learning Suite**: High-uncertainty candidate configurations identified for adaptive gem5 screening.
+  5. **Custom Predictor**: Real-time interactive sliders and radar chart for on-the-fly microarchitectural performance evaluation.
 
 ## 🧹 Maintenance Commands
 
