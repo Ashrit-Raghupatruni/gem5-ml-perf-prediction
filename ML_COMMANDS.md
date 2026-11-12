@@ -165,3 +165,17 @@ cp -r ml/saved_models/* /mnt/c/Users/ashri/Documents/antigravity/dazzling-pythag
 cp -r dataset/* /mnt/c/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/dataset/
 cp -r visualizations/* /mnt/c/Users/ashri/Documents/antigravity/dazzling-pythagoras/gem5-ml-perf-prediction/visualizations/
 ```
+
+---
+
+## 6. Interactive Web Dashboard & REST Service
+
+Launch the FastAPI backend serving both the REST prediction endpoints and the interactive dark-mode microarchitectural dashboard:
+
+\\ash
+python3 run_ui.py --host 127.0.0.1 --port 8000
+\
+- **REST Endpoint**: \POST /api/predict\ for JSON microarchitecture configurations.
+- **Batch CSV Endpoint**: \POST /api/batch-predict\ with multi-objective Pareto frontier identification.
+- **Interactive UI**: Real-time pipeline sliders, uncertainty bounds, physical area/power/energy gauges, and dimensionless ratio radar plots.
+

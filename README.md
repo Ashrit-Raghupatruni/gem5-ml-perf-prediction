@@ -364,7 +364,19 @@ python3 ml/predict_custom.py \
   --csv examples/custom_inputs_template.csv \
   --output-csv outputs/custom_predictions.csv \
   --output-json outputs/custom_predictions.json
-```
+`
+
+---
+
+### Step 9: Interactive Web Dashboard & Real-Time Explorer
+
+Launch the real-time design explorer and REST API backend:
+
+\\ash
+python3 run_ui.py --host 127.0.0.1 --port 8000
+\
+Access the modern dark-mode interface at \http://localhost:8000\. Explore single-configuration predictions via interactive sliders and segmented selectors, or drag-and-drop batch CSV datasets with automatic Pareto frontier identification and export capabilities.
+``
 
 
 ---

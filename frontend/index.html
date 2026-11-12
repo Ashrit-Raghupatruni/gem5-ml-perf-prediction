@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>gem5 ML Performance Predictor | Microarchitectural DSE</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            dark: {
+              900: '#0b0f19',
+              800: '#111827',
+              750: '#172033',
+              700: '#1f2937',
+              600: '#374151'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom refined scrollbars and transitions */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b0f19; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
+    .glass-card {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="bg-dark-900 text-gray-100 min-h-screen flex flex-col font-sans selection:bg-brand-500 selection:text-white">
+
+  <!-- Top Navbar -->
+  <header class="border-b border-gray-800 bg-dark-800/80 sticky top-0 z-50 backdrop-blur-md px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+        <i data-lucide="cpu" class="w-5 h-5 text-white"></i>
+      </div>
+      <div>
+        <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
+          gem5 ML Performance Predictor
+          <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">v2.0 ARM O3</span>
+        </h1>
+        <p class="text-xs text-gray-400">Surrogate Microarchitectural Design Space Exploration & Uncertainty Engine</p>
+      </div>
+    </div>
+    <div class="flex items-center space-x-4">
+      <div class="flex items-center gap-2 text-xs text-gray-400 border border-gray-700/60 rounded-lg px-3 py-1.5 bg-dark-750">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="font-mono text-gray-300">Model: HistGradientBoosting (R²: 0.9965)</span>
+      </div>
+      <a href="https://github.com/Ashrit-Raghupatruni/gem5-ml-perf-prediction" target="_blank" class="p-2 hover:bg-dark-700 rounded-lg text-gray-400 hover:text-white transition-colors" title="GitHub Repository">
+        <i data-lucide="github" class="w-5 h-5"></i>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- LEFT COLUMN: User Inputs (Single & Batch) -->
+    <div class="lg:col-span-5 flex flex-col space-y-6">
+
+      <!-- Mode Selector Tabs -->
+      <div class="flex rounded-xl bg-dark-800 p-1 border border-gray-800 shadow-inner">
+        <button id="tab-single-btn" onclick="switchMode('single')" class="flex-1 py-2 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 bg-brand-600 text-white shadow-md">
+          <i data-lucide="sliders" class="w-4 h-4"></i> Single Design Explorer
+        </button>
+        <button id="tab-batch-btn" onclick="switchMode('batch')" class="flex-1 py-2 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 text-gray-400 hover:text-gray-200">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Batch CSV Upload
+        </button>
+      </div>
+
+      <!-- SINGLE CONFIG PANEL -->
+      <div id="panel-single" class="glass-card rounded-2xl p-6 shadow-xl space-y-6">
+        <div class="flex items-center justify-between border-b border-gray-800/80 pb-4">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+            <i data-lucide="settings-2" class="w-4 h-4 text-brand-500"></i> Microarchitecture Parameters
+          </h2>
+          <button onclick="resetDefaults()" class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">Reset Defaults</button>
+        </div>
+
+        <!-- 1. Benchmark & Branch Predictor (Dropdowns / Selectors) -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-300 mb-1.5">Workload Benchmark</label>
+            <div class="relative">
+              <select id="input-workload" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                <option value="matmul" selected>matmul (Compute/Cache)</option>
+                <option value="stream">stream (Memory Bound)</option>
+                <option value="quicksort">quicksort (Branchy)</option>
+                <option value="hash">hash (Irregular Table)</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-300 mb-1.5">Branch Predictor</label>
+            <select id="input-bp" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-brand-500">
+              <option value="TournamentBP" selected>TournamentBP</option>
+              <option value="BiModeBP">BiModeBP</option>
+              <option value="LocalBP">LocalBP</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 2. Core Execution Pipeline (Sliders & Steppers) -->
+        <div class="space-y-4">
+          <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 pt-2">
+            <i data-lucide="fast-forward" class="w-3.5 h-3.5 text-indigo-400"></i> Pipeline Execution Width & Frequency
+          </div>
+
+          <!-- Clock Frequency -->
+          <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
+            <div class="flex justify-between items-center text-xs mb-1">
+              <span class="text-gray-300 font-medium">Clock Frequency (GHz)</span>
+              <span id="val-clk" class="font-mono text-indigo-400 font-bold">2.4 GHz</span>
+            </div>
+            <input type="range" id="input-clk" min="1.5" max="3.8" step="0.1" value="2.4" oninput="syncSlider('clk', this.value, ' GHz'); runSinglePrediction()" class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
+          </div>
+
+          <!-- Fetch & Issue Width -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
+              <div class="flex justify-between items-center text-xs mb-1">
+                <span class="text-gray-300 font-medium">Fetch Width</span>
+                <span id="val-fetch" class="font-mono text-indigo-400 font-bold">4</span>
+              </div>
+              <input type="range" id="input-fetch" min="2" max="8" step="2" value="4" oninput="syncFetchIssue('fetch', this.value); runSinglePrediction()" class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
+            </div>
+
+            <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
+              <div class="flex justify-between items-center text-xs mb-1">
+                <span class="text-gray-300 font-medium">Issue Width</span>
+                <span id="val-issue" class="font-mono text-indigo-400 font-bold">4</span>
+              </div>
+              <input type="range" id="input-issue" min="2" max="8" step="2" value="4" oninput="syncFetchIssue('issue', this.value); runSinglePrediction()" class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
+            </div>
+          </div>
+
+          <!-- ROB Entries -->
+          <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
+            <div class="flex justify-between items-center text-xs mb-1">
+              <span class="text-gray-300 font-medium">Reorder Buffer (ROB Entries)</span>
+              <span id="val-rob" class="font-mono text-indigo-400 font-bold">128</span>
+            </div>
+            <input type="range" id="input-rob" min="64" max="256" step="32" value="128" oninput="syncSlider('rob', this.value, ''); runSinglePrediction()" class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
+          </div>
+        </div>
+
+        <!-- 3. Cache Subsystem Controls -->
+        <div class="space-y-4">
+          <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 pt-2">
+            <i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-400"></i> Cache Hierarchy Configuration
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-gray-300 mb-1">L1D Size (KB)</label>
+              <select id="input-l1d-size" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
+                <option value="16">16 KB</option>
+                <option value="32">32 KB</option>
+                <option value="64" selected>64 KB</option>
+                <option value="128">128 KB</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-300 mb-1">L1D Assoc (Ways)</label>
+              <select id="input-l1d-assoc" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
+                <option value="1">1 (Direct)</option>
+                <option value="2" selected>2-way</option>
+                <option value="4">4-way</option>
+                <option value="8">8-way</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-gray-300 mb-1">L2 Cache Size (KB)</label>
+              <select id="input-l2-size" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
+                <option value="256">256 KB</option>
+                <option value="512">512 KB</option>
+                <option value="1024" selected>1024 KB (1 MB)</option>
+                <option value="2048">2048 KB (2 MB)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-300 mb-1">L2 Assoc (Ways)</label>
+              <select id="input-l2-assoc" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
+                <option value="2">2-way</option>
+                <option value="4" selected>4-way</option>
+                <option value="8">8-way</option>
+                <option value="16">16-way</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="runSinglePrediction()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all duration-200 active:scale-[0.98]">
+          <i data-lucide="zap" class="w-4 h-4"></i> Predict Performance & Uncertainty
+        </button>
+      </div>
+
+      <!-- BATCH CSV PANEL (Hidden by default) -->
+      <div id="panel-batch" class="glass-card rounded-2xl p-6 shadow-xl space-y-6 hidden">
+        <div class="flex items-center justify-between border-b border-gray-800/80 pb-4">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+            <i data-lucide="upload-cloud" class="w-4 h-4 text-brand-500"></i> Batch Design Space Inference
+          </h2>
+          <a href="/static/custom_inputs_template.csv" download="custom_inputs_template.csv" class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> Download Template
+          </a>
+        </div>
+
+        <!-- Drag-and-drop Zone -->
+        <div id="dropzone" onclick="document.getElementById('csv-file-input').click()" class="border-2 border-dashed border-gray-700 hover:border-brand-500 rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-dark-750/40">
+          <input type="file" id="csv-file-input" accept=".csv,.json" class="hidden" onchange="handleFileSelected(this.files[0])">
+          <div class="w-12 h-12 rounded-full bg-brand-600/10 text-brand-400 flex items-center justify-center mb-3">
+            <i data-lucide="file-up" class="w-6 h-6"></i>
+          </div>
+          <p class="text-sm font-medium text-gray-200">Drag & drop your CSV or JSON file here</p>
+          <p class="text-xs text-gray-400 mt-1">Accepts custom parameters, auto-fills missing queue/register constraints</p>
+          <span id="selected-filename" class="mt-3 text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded hidden"></span>
+        </div>
+
+        <button id="batch-submit-btn" onclick="submitBatchFile()" disabled class="w-full py-2.5 rounded-xl bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-brand-500 text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg transition-all">
+          <i data-lucide="play" class="w-4 h-4"></i> Run Batch Prediction & Pareto Screening
+        </button>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN: Output Dashboard & Interactive Visualizations -->
+    <div class="lg:col-span-7 flex flex-col space-y-6">
+
+      <!-- SECTION 1: Performance & Uncertainty Hero Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        
+        <!-- IPC Hero Card -->
+        <div class="glass-card rounded-2xl p-5 border-l-4 border-l-brand-500 shadow-lg relative overflow-hidden">
+          <div class="flex justify-between items-start">
+            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Predicted IPC</span>
+            <i data-lucide="gauge" class="w-4 h-4 text-brand-400"></i>
+          </div>
+          <div class="mt-2 flex items-baseline gap-2">
+            <span id="out-ipc" class="text-3xl font-extrabold text-white font-mono tracking-tight">2.4396</span>
+            <span class="text-xs text-gray-400 font-normal">inst/cyc</span>
+          </div>
+          <div class="mt-2 flex items-center text-xs text-emerald-400 gap-1 font-medium">
+            <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> High Confidence
+          </div>
+        </div>
+
+        <!-- Uncertainty (+/- sigma) -->
+        <div class="glass-card rounded-2xl p-5 border-l-4 border-l-amber-500 shadow-lg">
+          <div class="flex justify-between items-start">
+            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Epistemic Uncertainty</span>
+            <i data-lucide="activity" class="w-4 h-4 text-amber-400"></i>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1">
+            <span class="text-sm text-gray-400">±</span>
+            <span id="out-sigma" class="text-3xl font-extrabold text-amber-400 font-mono tracking-tight">0.0001</span>
+          </div>
+          <p id="out-ci" class="text-xs text-gray-400 mt-2 font-mono">95% CI: [2.439, 2.440]</p>
+        </div>
+
+        <!-- Upper Confidence Bound (UCB) -->
+        <div class="glass-card rounded-2xl p-5 border-l-4 border-l-indigo-500 shadow-lg">
+          <div class="flex justify-between items-start">
+            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">UCB (κ=1.5)</span>
+            <i data-lucide="sparkles" class="w-4 h-4 text-indigo-400"></i>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1">
+            <span id="out-ucb" class="text-3xl font-extrabold text-indigo-300 font-mono tracking-tight">2.4398</span>
+          </div>
+          <p class="text-xs text-gray-400 mt-2">Active-Learning Priority</p>
+        </div>
+
+        <!-- Latency -->
+        <div class="glass-card rounded-2xl p-5 border-l-4 border-l-gray-600 shadow-lg">
+          <div class="flex justify-between items-start">
+            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Inference Speed</span>
+            <i data-lucide="timer" class="w-4 h-4 text-gray-400"></i>
+          </div>
+          <div class="mt-2 flex items-baseline gap-1">
+            <span id="out-latency" class="text-3xl font-extrabold text-gray-200 font-mono tracking-tight">1.2</span>
+            <span class="text-xs text-gray-400">ms</span>
+          </div>
+          <p class="text-xs text-emerald-400 mt-2">~10,000x faster than gem5</p>
+        </div>
+
+      </div>
+
+      <!-- SECTION 2: Physical Hardware Proxies (Area, Power, Energy) -->
+      <div class="glass-card rounded-2xl p-5 shadow-xl grid grid-cols-3 gap-4 border border-gray-800">
+        <div class="flex items-center space-x-3 border-r border-gray-800 pr-4">
+          <div class="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center shrink-0">
+            <i data-lucide="box" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="text-xs text-gray-400 uppercase">Silicon Area Cost</div>
+            <div id="out-area" class="text-lg font-bold text-gray-100 font-mono">24.80</div>
+            <div class="text-[10px] text-gray-400">Weighted mm² proxy</div>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-3 border-r border-gray-800 pr-4">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
+            <i data-lucide="zap-off" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="text-xs text-gray-400 uppercase">Dynamic Power</div>
+            <div id="out-power" class="text-lg font-bold text-gray-100 font-mono">108.61</div>
+            <div class="text-[10px] text-gray-400">Freq · Issue · ROB^0.5</div>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center shrink-0">
+            <i data-lucide="battery-charging" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="text-xs text-gray-400 uppercase">Energy Per Inst</div>
+            <div id="out-energy" class="text-lg font-bold text-gray-100 font-mono">18.55</div>
+            <div class="text-[10px] text-gray-400">Power / (IPC · Freq)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 3 & 4: Charts (Radar & Pareto Tradeoff) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Radar Chart of Ratios -->
+        <div class="glass-card rounded-2xl p-5 shadow-xl flex flex-col">
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+              <i data-lucide="pie-chart" class="w-4 h-4 text-brand-400"></i> Microarchitecture Balance Ratios
+            </h3>
+            <span class="text-[10px] text-gray-400">Dimensionless normalized</span>
+          </div>
+          <div class="relative flex-1 min-h-[260px]">
+            <canvas id="radarChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Pareto Frontier Scatter Chart -->
+        <div class="glass-card rounded-2xl p-5 shadow-xl flex flex-col">
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+              <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i> Performance vs Area Frontier
+            </h3>
+            <span class="text-[10px] text-emerald-400 font-mono">● Current Design</span>
+          </div>
+          <div class="relative flex-1 min-h-[260px]">
+            <canvas id="scatterChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- SECTION 5: Batch Predictions Data Table (Dynamic when batch is run) -->
+      <div id="batch-results-container" class="glass-card rounded-2xl p-5 shadow-xl hidden space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-200">Batch Inference Results</h3>
+            <p id="batch-summary-text" class="text-xs text-gray-400">Evaluated configurations</p>
+          </div>
+          <button onclick="exportBatchTableCSV()" class="px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 text-xs text-indigo-300 flex items-center gap-1.5 border border-gray-700">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> Export Results CSV
+          </button>
+        </div>
+        <div class="overflow-x-auto max-h-72">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead class="bg-dark-750 text-gray-400 sticky top-0 border-b border-gray-700">
+              <tr>
+                <th class="p-2.5">Workload</th>
+                <th class="p-2.5">Fetch / Issue</th>
+                <th class="p-2.5">ROB</th>
+                <th class="p-2.5">Freq</th>
+                <th class="p-2.5">Pred IPC</th>
+                <th class="p-2.5">Uncertainty</th>
+                <th class="p-2.5">Area Cost</th>
+                <th class="p-2.5">Pareto</th>
+              </tr>
+            </thead>
+            <tbody id="batch-table-body" class="divide-y divide-gray-800 text-gray-300 font-mono">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Script for UI Logic, Chart Rendering, and API Calls -->
+  <script>
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    let radarChartInst = null;
+    let scatterChartInst = null;
+    let currentBatchData = null;
+    let selectedBatchFile = null;
+
+    // Helper functions
+    function syncSlider(id, val, suffix) {
+      document.getElementById('val-' + id).innerText = val + suffix;
+    }
+
+    function syncFetchIssue(source, val) {
+      const fetchVal = parseInt(document.getElementById('input-fetch').value);
+      const issueVal = parseInt(document.getElementById('input-issue').value);
+
+      if (source === 'fetch' && issueVal > val) {
+        document.getElementById('input-issue').value = val;
+        document.getElementById('val-issue').innerText = val;
+      } else if (source === 'issue' && val > fetchVal) {
+        document.getElementById('input-fetch').value = val;
+        document.getElementById('val-fetch').innerText = val;
+      }
+      document.getElementById('val-' + source).innerText = val;
+    }
+
+    function switchMode(mode) {
+      const singleBtn = document.getElementById('tab-single-btn');
+      const batchBtn = document.getElementById('tab-batch-btn');
+      const singlePanel = document.getElementById('panel-single');
+      const batchPanel = document.getElementById('panel-batch');
+
+      if (mode === 'single') {
+        singleBtn.className = "flex-1 py-2 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 bg-brand-600 text-white shadow-md";
+        batchBtn.className = "flex-1 py-2 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 text-gray-400 hover:text-gray-200";
+        singlePanel.classList.remove('hidden');
+        batchPanel.classList.add('hidden');
+      } else {
+        batchBtn.className = "flex-1 py-2 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 bg-brand-600 text-white shadow-md";
+        singleBtn.className = "flex-1 py-2 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 text-gray-400 hover:text-gray-200";
+        singlePanel.classList.add('hidden');
+        batchPanel.classList.remove('hidden');
+      }
+    }
+
+    function resetDefaults() {
+      document.getElementById('input-workload').value = 'matmul';
+      document.getElementById('input-bp').value = 'TournamentBP';
+      document.getElementById('input-clk').value = 2.4;
+      document.getElementById('val-clk').innerText = '2.4 GHz';
+      document.getElementById('input-fetch').value = 4;
+      document.getElementById('val-fetch').innerText = '4';
+      document.getElementById('input-issue').value = 4;
+      document.getElementById('val-issue').innerText = '4';
+      document.getElementById('input-rob').value = 128;
+      document.getElementById('val-rob').innerText = '128';
+      document.getElementById('input-l1d-size').value = 64;
+      document.getElementById('input-l1d-assoc').value = 2;
+      document.getElementById('input-l2-size').value = 1024;
+      document.getElementById('input-l2-assoc').value = 4;
+      runSinglePrediction();
+    }
+
+    // Chart initializations
+    function initCharts() {
+      // 1. Radar Chart
+      const ctxRadar = document.getElementById('radarChart').getContext('2d');
+      radarChartInst = new Chart(ctxRadar, {
+        type: 'radar',
+        data: {
+          labels: ['ROB/Issue', 'Issue/Fetch', 'Commit/Issue', 'IQ/ROB', 'LS/ROB', 'L2/L1D', 'Regs/ROB'],
+          datasets: [{
+            label: 'Current Design',
+            data: [32, 1.0, 1.0, 0.25, 0.25, 16.0, 0.8],
+            backgroundColor: 'rgba(99, 102, 241, 0.25)',
+            borderColor: 'rgba(99, 102, 241, 0.9)',
+            borderWidth: 2,
+            pointBackgroundColor: '#818cf8',
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            r: {
+              angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+              grid: { color: 'rgba(255, 255, 255, 0.08)' },
+              pointLabels: { color: '#9ca3af', font: { size: 10 } },
+              ticks: { display: false }
+            }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      // 2. Scatter Plot (IPC vs Area Cost)
+      const ctxScatter = document.getElementById('scatterChart').getContext('2d');
+      scatterChartInst = new Chart(ctxScatter, {
+        type: 'scatter',
+        data: {
+          datasets: [
+            {
+              label: 'Current Prediction',
+              data: [{ x: 24.8, y: 2.4396 }],
+              backgroundColor: '#ec4899',
+              borderColor: '#f43f5e',
+              pointRadius: 8,
+              pointHoverRadius: 10
+            },
+            {
+              label: 'Pareto Reference',
+              data: [
+                { x: 14.40, y: 0.9535 },
+                { x: 17.20, y: 1.4283 },
+                { x: 20.40, y: 2.5202 },
+                { x: 28.00, y: 3.2506 },
+                { x: 38.00, y: 3.8279 }
+              ],
+              backgroundColor: '#10b981',
+              pointRadius: 5
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              title: { display: true, text: 'Area Cost Proxy', color: '#9ca3af', font: { size: 11 } },
+              grid: { color: 'rgba(255, 255, 255, 0.06)' },
+              ticks: { color: '#9ca3af' }
+            },
+            y: {
+              title: { display: true, text: 'Predicted IPC', color: '#9ca3af', font: { size: 11 } },
+              grid: { color: 'rgba(255, 255, 255, 0.06)' },
+              ticks: { color: '#9ca3af' }
+            }
+          },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { color: '#d1d5db', font: { size: 10 } }
+            }
+          }
+        }
+      });
+    }
+
+    // Call API for single prediction
+    async function runSinglePrediction() {
+      const payload = {
+        workload: document.getElementById('input-workload').value,
+        branch_predictor: document.getElementById('input-bp').value,
+        clk_freq_ghz: parseFloat(document.getElementById('input-clk').value),
+        fetch_width: parseInt(document.getElementById('input-fetch').value),
+        issue_width: parseInt(document.getElementById('input-issue').value),
+        rob_entries: parseInt(document.getElementById('input-rob').value),
+        l1d_size_kb: parseInt(document.getElementById('input-l1d-size').value),
+        l1d_assoc: parseInt(document.getElementById('input-l1d-assoc').value),
+        l1i_size_kb: 32,
+        l1i_assoc: 2,
+        l2_size_kb: parseInt(document.getElementById('input-l2-size').value),
+        l2_assoc: parseInt(document.getElementById('input-l2-assoc').value)
+      };
+
+      try {
+        const response = await fetch('/api/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error('API failed');
+        const data = await response.json();
+
+        // Update Hero Metrics
+        document.getElementById('out-ipc').innerText = data.ipc.toFixed(4);
+        document.getElementById('out-sigma').innerText = data.uncertainty_sigma.toFixed(4);
+        document.getElementById('out-ci').innerText = `95% CI: [${data.ci_lower.toFixed(3)}, ${data.ci_upper.toFixed(3)}]`;
+        document.getElementById('out-ucb').innerText = data.ucb.toFixed(4);
+        document.getElementById('out-latency').innerText = data.latency_ms.toFixed(1);
+
+        // Update Physical Proxies
+        document.getElementById('out-area').innerText = data.area_cost_proxy.toFixed(2);
+        document.getElementById('out-power').innerText = data.dynamic_power_proxy.toFixed(2);
+        document.getElementById('out-energy').innerText = data.energy_per_instruction_proxy.toFixed(2);
+
+        // Update Radar Chart
+        if (radarChartInst && data.ratios) {
+          radarChartInst.data.datasets[0].data = [
+            data.ratios.rob_to_issue_ratio || 0,
+            data.ratios.pipe_issue_fetch_ratio || 0,
+            data.ratios.pipe_commit_issue_ratio || 0,
+            data.ratios.iq_to_rob_ratio || 0,
+            data.ratios.ls_to_rob_ratio || 0,
+            data.ratios.cache_l2_l1d_ratio || 0,
+            data.ratios.phys_regs_to_rob_ratio || 0
+          ];
+          radarChartInst.update();
+        }
+
+        // Update Scatter Point
+        if (scatterChartInst) {
+          scatterChartInst.data.datasets[0].data = [{
+            x: data.area_cost_proxy,
+            y: data.ipc
+          }];
+          scatterChartInst.update();
+        }
+
+      } catch (err) {
+        console.error('Prediction failed:', err);
+      }
+    }
+
+    // Batch File Handlers
+    function handleFileSelected(file) {
+      if (!file) return;
+      selectedBatchFile = file;
+      const label = document.getElementById('selected-filename');
+      label.innerText = file.name + ` (${(file.size / 1024).toFixed(1)} KB)`;
+      label.classList.remove('hidden');
+      document.getElementById('batch-submit-btn').disabled = false;
+    }
+
+    async function submitBatchFile() {
+      if (!selectedBatchFile) return;
+
+      const formData = new FormData();
+      formData.append('file', selectedBatchFile);
+
+      const btn = document.getElementById('batch-submit-btn');
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Processing batch...`;
+      lucide.createIcons();
+
+      try {
+        const res = await fetch('/api/batch-predict', {
+          method: 'POST',
+          body: formData
+        });
+        if (!res.ok) throw new Error('Batch inference failed');
+        const data = await res.json();
+        currentBatchData = data;
+
+        // Render table
+        renderBatchTable(data);
+        
+        // Update Scatter chart with all batch points + Pareto frontier
+        renderBatchScatter(data);
+
+      } catch (e) {
+        alert('Batch prediction error: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="play" class="w-4 h-4"></i> Run Batch Prediction & Pareto Screening`;
+        lucide.createIcons();
+      }
+    }
+
+    function renderBatchTable(data) {
+      const container = document.getElementById('batch-results-container');
+      const tbody = document.getElementById('batch-table-body');
+      const summaryText = document.getElementById('batch-summary-text');
+      tbody.innerHTML = '';
+
+      summaryText.innerText = `${data.total_samples} configurations | Mean IPC: ${data.summary.mean_ipc} | Pareto Optimal: ${data.summary.pareto_optimal_count}`;
+
+      data.predictions.forEach((row, i) => {
+        const isPareto = data.pareto_frontier.some(p => p.predicted_ipc === row.predicted_ipc && p.area_cost_proxy === row.area_cost_proxy);
+        const tr = document.createElement('tr');
+        tr.className = isPareto ? 'bg-emerald-950/20 text-emerald-300 font-semibold' : 'hover:bg-dark-750/50';
+        tr.innerHTML = `
+          <td class="p-2.5 font-sans">${row.workload}</td>
+          <td class="p-2.5">${row.fetch_width} / ${row.issue_width}</td>
+          <td class="p-2.5">${row.rob_entries}</td>
+          <td class="p-2.5">${row.clk_freq_ghz} GHz</td>
+          <td class="p-2.5 font-bold ${isPareto ? 'text-emerald-400' : 'text-indigo-400'}">${row.predicted_ipc.toFixed(4)}</td>
+          <td class="p-2.5 text-gray-400">±${row.uncertainty_std.toFixed(4)}</td>
+          <td class="p-2.5 text-gray-300">${row.area_cost_proxy.toFixed(1)}</td>
+          <td class="p-2.5">${isPareto ? '<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400">Optimal</span>' : '<span class="text-gray-500">-</span>'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      container.classList.remove('hidden');
+    }
+
+    function renderBatchScatter(data) {
+      if (!scatterChartInst) return;
+
+      const batchPoints = data.predictions.map(p => ({ x: p.area_cost_proxy, y: p.predicted_ipc }));
+      const paretoPoints = data.pareto_frontier.map(p => ({ x: p.area_cost_proxy, y: p.predicted_ipc }));
+
+      scatterChartInst.data.datasets = [
+        {
+          label: 'Batch Configurations',
+          data: batchPoints,
+          backgroundColor: 'rgba(99, 102, 241, 0.6)',
+          pointRadius: 4
+        },
+        {
+          label: 'Pareto Frontier (Non-Dominated)',
+          data: paretoPoints,
+          backgroundColor: '#10b981',
+          borderColor: '#059669',
+          pointRadius: 7,
+          showLine: true
+        }
+      ];
+      scatterChartInst.update();
+    }
+
+    function exportBatchTableCSV() {
+      if (!currentBatchData || !currentBatchData.predictions) return;
+      const keys = Object.keys(currentBatchData.predictions[0]);
+      let csv = keys.join(',') + '\n';
+      currentBatchData.predictions.forEach(row => {
+        csv += keys.map(k => row[k]).join(',') + '\n';
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'custom_batch_predictions.csv';
+      a.click();
+    }
+
+    // Initialize on page load
+    window.onload = () => {
+      initCharts();
+      runSinglePrediction();
+    };
+  </script>
+</body>
+</html>

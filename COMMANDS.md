@@ -228,7 +228,19 @@ python3 ml/predict_custom.py \
   --csv examples/custom_inputs_template.csv \
   --output-csv outputs/custom_predictions.csv \
   --output-json outputs/custom_predictions.json
-```
+`
+
+---
+
+### Step 10: Launch Interactive Web Dashboard & REST API
+
+Launch the real-time interactive microarchitectural design explorer UI:
+
+\\ash
+python3 run_ui.py --host 127.0.0.1 --port 8000
+\
+- Open in browser: \http://localhost:8000- Interactive Swagger/OpenAPI docs: \http://localhost:8000/docs- Features real-time parameter sliders, epistemic uncertainty bars, physical cost proxies (Area, Power, Energy), microarchitectural balance radar charts, and batch CSV drag-and-drop with Pareto frontier screening.
+``
 
 ## 🧹 Maintenance Commands
 
