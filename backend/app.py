@@ -1,6 +1,7 @@
 """FastAPI main application serving REST endpoints and static UI dashboard."""
 import os
 import io
+import json
 import pandas as pd
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,8 +13,8 @@ from backend.services import predict_single, predict_batch_df, get_pareto_refere
 
 app = FastAPI(
     title="gem5 ML Performance Prediction Engine",
-    description="Microarchitectural performance prediction, uncertainty estimation, and design space exploration.",
-    version="2.0.0"
+    description="Microarchitectural performance prediction, dataset inspection, and active learning.",
+    version="2.1.0"
 )
 
 # CORS middleware
@@ -26,6 +27,14 @@ app.add_middleware(
 )
 
 FRONTEND_DIR = os.path.join(REPO_ROOT, "frontend")
+VISUALIZATIONS_DIR = os.path.join(REPO_ROOT, "visualizations")
+DATASET_DIR = os.path.join(REPO_ROOT, "dataset")
+CONFIGS_DIR = os.path.join(REPO_ROOT, "configs")
+MODELS_DIR = os.path.join(REPO_ROOT, "ml", "saved_models")
+
+# Mount visualizations as static route
+if os.path.exists(VISUALIZATIONS_DIR):
+    app.mount("/visualizations", StaticFiles(directory=VISUALIZATIONS_DIR), name="visualizations")
 
 @app.post("/api/predict", response_model=SinglePredictionResponse)
 def api_predict_single(config: SingleHardwareConfig):
@@ -59,33 +68,79 @@ async def api_predict_batch(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Batch prediction error: {str(e)}")
 
+@app.get("/api/dataset/view")
+def api_view_dataset(view_type: str = "features", limit: int = 50):
+    """View-only inspection for Input Features or Output Targets without download."""
+    if view_type == "outputs":
+        csv_file = os.path.join(DATASET_DIR, "dataset_outputs.csv")
+    else:
+        csv_file = os.path.join(DATASET_DIR, "dataset_features.csv")
+        
+    if not os.path.exists(csv_file):
+        # Fallback to dataset_cleaned.csv if split files aren't found
+        csv_file = os.path.join(DATASET_DIR, "dataset_cleaned.csv")
+        
+    if not os.path.exists(csv_file):
+        raise HTTPException(status_code=404, detail="Dataset file not found")
+        
+    df = pd.read_csv(csv_file, nrows=limit)
+    # Total count without loading full memory
+    with open(csv_file, "r") as f:
+        total_rows = sum(1 for _ in f) - 1
+        
+    return {
+        "view_type": view_type,
+        "total_rows": total_rows,
+        "columns": list(df.columns),
+        "data": df.fillna("").to_dict(orient="records")
+    }
+
+@app.get("/api/validation/top5")
+def api_get_validation_top5():
+    """Ground-truth validation comparison for Top-5 candidates."""
+    val_csv = os.path.join(DATASET_DIR, "validation_results.csv")
+    val_json = os.path.join(DATASET_DIR, "validation_summary.json")
+    
+    table_data = []
+    if os.path.exists(val_csv):
+        df = pd.read_csv(val_csv)
+        table_data = df.to_dict(orient="records")
+        
+    summary = {}
+    if os.path.exists(val_json):
+        with open(val_json, "r") as f:
+            summary = json.load(f)
+            
+    return {
+        "status": "success",
+        "table": table_data,
+        "summary": summary
+    }
+
+@app.get("/api/models/metrics")
+def api_get_model_metrics():
+    """Metrics across the 4 evaluated models."""
+    meta_path = os.path.join(MODELS_DIR, "model_metadata.json")
+    if os.path.exists(meta_path):
+        with open(meta_path, "r") as f:
+            return json.load(f)
+    return {}
+
+@app.get("/api/active-learning/queries")
+def api_get_active_queries():
+    """Queries selected by active learning uncertainty sampling."""
+    queries_path = os.path.join(CONFIGS_DIR, "active_queries.json")
+    if os.path.exists(queries_path):
+        with open(queries_path, "r") as f:
+            data = json.load(f)
+            return {"status": "success", "queries": data}
+    return {"status": "error", "queries": []}
+
 @app.get("/api/pareto")
 def api_get_pareto():
     return {
         "status": "success",
         "top5_candidates": get_pareto_reference()
-    }
-
-@app.get("/api/defaults/{workload}")
-def api_get_workload_defaults(workload: str):
-    valid_workloads = ["matmul", "stream", "quicksort", "hash"]
-    if workload not in valid_workloads:
-        workload = "matmul"
-    return {
-        "workload": workload,
-        "fetch_width": 4,
-        "decode_width": 4,
-        "issue_width": 4,
-        "commit_width": 4,
-        "rob_entries": 128,
-        "branch_predictor": "TournamentBP",
-        "l1d_size_kb": 64,
-        "l1d_assoc": 2,
-        "l1i_size_kb": 32,
-        "l1i_assoc": 2,
-        "l2_size_kb": 1024,
-        "l2_assoc": 4,
-        "clk_freq_ghz": 2.4
     }
 
 # Mount static frontend
@@ -98,3 +153,4 @@ def serve_index():
     if os.path.exists(index_file):
         return FileResponse(index_file)
     return {"message": "gem5 ML Prediction API active. Frontend index.html not yet initialized."}
+

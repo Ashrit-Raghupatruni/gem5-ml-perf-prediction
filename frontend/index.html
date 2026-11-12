@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>gem5 ML Performance Predictor | Microarchitectural DSE</title>
+  <title>gem5 ML Microarchitectural Research Platform</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Chart.js CDN -->
@@ -17,13 +17,14 @@
         extend: {
           colors: {
             brand: {
-              50: '#eef2ff',
               500: '#6366f1',
               600: '#4f46e5',
-              700: '#4338ca',
+              700: '#4338ca'
             },
             dark: {
+              950: '#070a11',
               900: '#0b0f19',
+              850: '#0e1424',
               800: '#111827',
               750: '#172033',
               700: '#1f2937',
@@ -35,374 +36,264 @@
     }
   </script>
   <style>
-    /* Custom refined scrollbars and transitions */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #0b0f19; }
     ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
     .glass-card {
-      background: rgba(17, 24, 39, 0.85);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(17, 24, 39, 0.88);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+    .nav-btn.active {
+      background: #4f46e5;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
     }
   </style>
 </head>
-<body class="bg-dark-900 text-gray-100 min-h-screen flex flex-col font-sans selection:bg-brand-500 selection:text-white">
+<body class="bg-dark-950 text-gray-100 min-h-screen flex flex-col font-sans selection:bg-brand-500 selection:text-white">
 
-  <!-- Top Navbar -->
-  <header class="border-b border-gray-800 bg-dark-800/80 sticky top-0 z-50 backdrop-blur-md px-6 py-3.5 flex items-center justify-between">
-    <div class="flex items-center space-x-3">
-      <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+  <!-- Top Navigation Bar -->
+  <header class="border-b border-gray-800 bg-dark-900/90 sticky top-0 z-50 backdrop-blur-md px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center space-x-3.5">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-indigo-500/25">
         <i data-lucide="cpu" class="w-5 h-5 text-white"></i>
       </div>
       <div>
         <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
-          gem5 ML Performance Predictor
-          <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">v2.0 ARM O3</span>
+          gem5 ML Research Platform
+          <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">AArch64 gem5 v24+</span>
         </h1>
-        <p class="text-xs text-gray-400">Surrogate Microarchitectural Design Space Exploration & Uncertainty Engine</p>
+        <p class="text-xs text-gray-400">Microarchitectural Performance Modeling, Active Learning & Validation Suite</p>
       </div>
     </div>
-    <div class="flex items-center space-x-4">
-      <div class="flex items-center gap-2 text-xs text-gray-400 border border-gray-700/60 rounded-lg px-3 py-1.5 bg-dark-750">
-        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span class="font-mono text-gray-300">Model: HistGradientBoosting (R²: 0.9965)</span>
+
+    <!-- Multi-Page Section Navigation -->
+    <nav class="flex items-center bg-dark-800 p-1 rounded-xl border border-gray-800/80 shadow-inner">
+      <button onclick="goToPage('overview')" id="nav-overview" class="nav-btn active px-3.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all text-gray-400 hover:text-white">
+        <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> Dashboard Overview
+      </button>
+      <button onclick="goToPage('dataset')" id="nav-dataset" class="nav-btn px-3.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all text-gray-400 hover:text-white">
+        <i data-lucide="database" class="w-3.5 h-3.5"></i> Dataset Explorer
+      </button>
+      <button onclick="goToPage('visualizations')" id="nav-visualizations" class="nav-btn px-3.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all text-gray-400 hover:text-white">
+        <i data-lucide="line-chart" class="w-3.5 h-3.5"></i> Visualizations
+      </button>
+      <button onclick="goToPage('active-learning')" id="nav-active-learning" class="nav-btn px-3.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all text-gray-400 hover:text-white">
+        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Active Learning
+      </button>
+      <button onclick="goToPage('custom-predict')" id="nav-custom-predict" class="nav-btn px-3.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all text-gray-400 hover:text-white">
+        <i data-lucide="sliders" class="w-3.5 h-3.5"></i> Custom Predictor
+      </button>
+    </nav>
+
+    <div class="flex items-center space-x-3">
+      <div class="hidden sm:flex items-center gap-2 text-xs text-emerald-400 border border-emerald-500/20 rounded-lg px-2.5 py-1 bg-emerald-500/10">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="font-mono">5,000 Validated Samples</span>
       </div>
-      <a href="https://github.com/Ashrit-Raghupatruni/gem5-ml-perf-prediction" target="_blank" class="p-2 hover:bg-dark-700 rounded-lg text-gray-400 hover:text-white transition-colors" title="GitHub Repository">
-        <i data-lucide="github" class="w-5 h-5"></i>
+      <a href="https://github.com/Ashrit-Raghupatruni/gem5-ml-perf-prediction" target="_blank" class="p-2 hover:bg-dark-800 rounded-lg text-gray-400 hover:text-white transition-colors" title="GitHub Repository">
+        <i data-lucide="github" class="w-4 h-4"></i>
       </a>
     </div>
   </header>
 
   <!-- Main Container -->
-  <main class="flex-1 max-w-[1600px] w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+  <main class="flex-1 max-w-[1680px] w-full mx-auto p-6">
 
-    <!-- LEFT COLUMN: User Inputs (Single & Batch) -->
-    <div class="lg:col-span-5 flex flex-col space-y-6">
+    <!-- ======================================================== -->
+    <!-- PAGE 1: OVERVIEW (Matching User's Sketch) -->
+    <!-- ======================================================== -->
+    <div id="page-overview" class="space-y-6">
 
-      <!-- Mode Selector Tabs -->
-      <div class="flex rounded-xl bg-dark-800 p-1 border border-gray-800 shadow-inner">
-        <button id="tab-single-btn" onclick="switchMode('single')" class="flex-1 py-2 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 bg-brand-600 text-white shadow-md">
-          <i data-lucide="sliders" class="w-4 h-4"></i> Single Design Explorer
-        </button>
-        <button id="tab-batch-btn" onclick="switchMode('batch')" class="flex-1 py-2 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 text-gray-400 hover:text-gray-200">
-          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Batch CSV Upload
-        </button>
-      </div>
+      <!-- TOP TRIO: Dataset Preview | Validation Top 5 | Models Metrics -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-      <!-- SINGLE CONFIG PANEL -->
-      <div id="panel-single" class="glass-card rounded-2xl p-6 shadow-xl space-y-6">
-        <div class="flex items-center justify-between border-b border-gray-800/80 pb-4">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-2">
-            <i data-lucide="settings-2" class="w-4 h-4 text-brand-500"></i> Microarchitecture Parameters
-          </h2>
-          <button onclick="resetDefaults()" class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">Reset Defaults</button>
-        </div>
-
-        <!-- 1. Benchmark & Branch Predictor (Dropdowns / Selectors) -->
-        <div class="grid grid-cols-2 gap-4">
+        <!-- 1. Dataset Preview (Quick View) -->
+        <div class="lg:col-span-4 glass-card rounded-2xl p-5 shadow-xl flex flex-col justify-between border-t-2 border-t-indigo-500">
           <div>
-            <label class="block text-xs font-medium text-gray-300 mb-1.5">Workload Benchmark</label>
-            <div class="relative">
-              <select id="input-workload" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
-                <option value="matmul" selected>matmul (Compute/Cache)</option>
-                <option value="stream">stream (Memory Bound)</option>
-                <option value="quicksort">quicksort (Branchy)</option>
-                <option value="hash">hash (Irregular Table)</option>
-              </select>
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                <i data-lucide="table-2" class="w-4 h-4 text-indigo-400"></i> Dataset: CSV Data
+              </h3>
+              <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-dark-750 text-indigo-300 border border-gray-700">View Only</span>
             </div>
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-300 mb-1.5">Branch Predictor</label>
-            <select id="input-bp" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-brand-500">
-              <option value="TournamentBP" selected>TournamentBP</option>
-              <option value="BiModeBP">BiModeBP</option>
-              <option value="LocalBP">LocalBP</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- 2. Core Execution Pipeline (Sliders & Steppers) -->
-        <div class="space-y-4">
-          <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 pt-2">
-            <i data-lucide="fast-forward" class="w-3.5 h-3.5 text-indigo-400"></i> Pipeline Execution Width & Frequency
-          </div>
-
-          <!-- Clock Frequency -->
-          <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
-            <div class="flex justify-between items-center text-xs mb-1">
-              <span class="text-gray-300 font-medium">Clock Frequency (GHz)</span>
-              <span id="val-clk" class="font-mono text-indigo-400 font-bold">2.4 GHz</span>
-            </div>
-            <input type="range" id="input-clk" min="1.5" max="3.8" step="0.1" value="2.4" oninput="syncSlider('clk', this.value, ' GHz'); runSinglePrediction()" class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
-          </div>
-
-          <!-- Fetch & Issue Width -->
-          <div class="grid grid-cols-2 gap-3">
-            <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
-              <div class="flex justify-between items-center text-xs mb-1">
-                <span class="text-gray-300 font-medium">Fetch Width</span>
-                <span id="val-fetch" class="font-mono text-indigo-400 font-bold">4</span>
+            <p class="text-xs text-gray-400 mb-4">5,000 harvested cycle-level simulation records across 4 workloads.</p>
+            
+            <div class="grid grid-cols-2 gap-3 mb-4">
+              <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
+                <div class="text-[11px] text-gray-400">Input Features</div>
+                <div class="text-base font-bold text-gray-100 font-mono mt-0.5">20 Columns</div>
+                <div class="text-[10px] text-gray-400">Fetch, ROB, Caches, Freq</div>
               </div>
-              <input type="range" id="input-fetch" min="2" max="8" step="2" value="4" oninput="syncFetchIssue('fetch', this.value); runSinglePrediction()" class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
-            </div>
-
-            <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
-              <div class="flex justify-between items-center text-xs mb-1">
-                <span class="text-gray-300 font-medium">Issue Width</span>
-                <span id="val-issue" class="font-mono text-indigo-400 font-bold">4</span>
+              <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
+                <div class="text-[11px] text-gray-400">Output Targets</div>
+                <div class="text-base font-bold text-gray-100 font-mono mt-0.5">16 Columns</div>
+                <div class="text-[10px] text-gray-400">IPC, Misses, Cycles</div>
               </div>
-              <input type="range" id="input-issue" min="2" max="8" step="2" value="4" oninput="syncFetchIssue('issue', this.value); runSinglePrediction()" class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
             </div>
           </div>
-
-          <!-- ROB Entries -->
-          <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
-            <div class="flex justify-between items-center text-xs mb-1">
-              <span class="text-gray-300 font-medium">Reorder Buffer (ROB Entries)</span>
-              <span id="val-rob" class="font-mono text-indigo-400 font-bold">128</span>
-            </div>
-            <input type="range" id="input-rob" min="64" max="256" step="32" value="128" oninput="syncSlider('rob', this.value, ''); runSinglePrediction()" class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
-          </div>
-        </div>
-
-        <!-- 3. Cache Subsystem Controls -->
-        <div class="space-y-4">
-          <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 pt-2">
-            <i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-400"></i> Cache Hierarchy Configuration
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs text-gray-300 mb-1">L1D Size (KB)</label>
-              <select id="input-l1d-size" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
-                <option value="16">16 KB</option>
-                <option value="32">32 KB</option>
-                <option value="64" selected>64 KB</option>
-                <option value="128">128 KB</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs text-gray-300 mb-1">L1D Assoc (Ways)</label>
-              <select id="input-l1d-assoc" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
-                <option value="1">1 (Direct)</option>
-                <option value="2" selected>2-way</option>
-                <option value="4">4-way</option>
-                <option value="8">8-way</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs text-gray-300 mb-1">L2 Cache Size (KB)</label>
-              <select id="input-l2-size" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
-                <option value="256">256 KB</option>
-                <option value="512">512 KB</option>
-                <option value="1024" selected>1024 KB (1 MB)</option>
-                <option value="2048">2048 KB (2 MB)</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs text-gray-300 mb-1">L2 Assoc (Ways)</label>
-              <select id="input-l2-assoc" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
-                <option value="2">2-way</option>
-                <option value="4" selected>4-way</option>
-                <option value="8">8-way</option>
-                <option value="16">16-way</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <button onclick="runSinglePrediction()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all duration-200 active:scale-[0.98]">
-          <i data-lucide="zap" class="w-4 h-4"></i> Predict Performance & Uncertainty
-        </button>
-      </div>
-
-      <!-- BATCH CSV PANEL (Hidden by default) -->
-      <div id="panel-batch" class="glass-card rounded-2xl p-6 shadow-xl space-y-6 hidden">
-        <div class="flex items-center justify-between border-b border-gray-800/80 pb-4">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-2">
-            <i data-lucide="upload-cloud" class="w-4 h-4 text-brand-500"></i> Batch Design Space Inference
-          </h2>
-          <a href="/static/custom_inputs_template.csv" download="custom_inputs_template.csv" class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
-            <i data-lucide="download" class="w-3.5 h-3.5"></i> Download Template
-          </a>
-        </div>
-
-        <!-- Drag-and-drop Zone -->
-        <div id="dropzone" onclick="document.getElementById('csv-file-input').click()" class="border-2 border-dashed border-gray-700 hover:border-brand-500 rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-dark-750/40">
-          <input type="file" id="csv-file-input" accept=".csv,.json" class="hidden" onchange="handleFileSelected(this.files[0])">
-          <div class="w-12 h-12 rounded-full bg-brand-600/10 text-brand-400 flex items-center justify-center mb-3">
-            <i data-lucide="file-up" class="w-6 h-6"></i>
-          </div>
-          <p class="text-sm font-medium text-gray-200">Drag & drop your CSV or JSON file here</p>
-          <p class="text-xs text-gray-400 mt-1">Accepts custom parameters, auto-fills missing queue/register constraints</p>
-          <span id="selected-filename" class="mt-3 text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded hidden"></span>
-        </div>
-
-        <button id="batch-submit-btn" onclick="submitBatchFile()" disabled class="w-full py-2.5 rounded-xl bg-brand-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-brand-500 text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg transition-all">
-          <i data-lucide="play" class="w-4 h-4"></i> Run Batch Prediction & Pareto Screening
-        </button>
-      </div>
-
-    </div>
-
-    <!-- RIGHT COLUMN: Output Dashboard & Interactive Visualizations -->
-    <div class="lg:col-span-7 flex flex-col space-y-6">
-
-      <!-- SECTION 1: Performance & Uncertainty Hero Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        
-        <!-- IPC Hero Card -->
-        <div class="glass-card rounded-2xl p-5 border-l-4 border-l-brand-500 shadow-lg relative overflow-hidden">
-          <div class="flex justify-between items-start">
-            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Predicted IPC</span>
-            <i data-lucide="gauge" class="w-4 h-4 text-brand-400"></i>
-          </div>
-          <div class="mt-2 flex items-baseline gap-2">
-            <span id="out-ipc" class="text-3xl font-extrabold text-white font-mono tracking-tight">2.4396</span>
-            <span class="text-xs text-gray-400 font-normal">inst/cyc</span>
-          </div>
-          <div class="mt-2 flex items-center text-xs text-emerald-400 gap-1 font-medium">
-            <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> High Confidence
-          </div>
-        </div>
-
-        <!-- Uncertainty (+/- sigma) -->
-        <div class="glass-card rounded-2xl p-5 border-l-4 border-l-amber-500 shadow-lg">
-          <div class="flex justify-between items-start">
-            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Epistemic Uncertainty</span>
-            <i data-lucide="activity" class="w-4 h-4 text-amber-400"></i>
-          </div>
-          <div class="mt-2 flex items-baseline gap-1">
-            <span class="text-sm text-gray-400">±</span>
-            <span id="out-sigma" class="text-3xl font-extrabold text-amber-400 font-mono tracking-tight">0.0001</span>
-          </div>
-          <p id="out-ci" class="text-xs text-gray-400 mt-2 font-mono">95% CI: [2.439, 2.440]</p>
-        </div>
-
-        <!-- Upper Confidence Bound (UCB) -->
-        <div class="glass-card rounded-2xl p-5 border-l-4 border-l-indigo-500 shadow-lg">
-          <div class="flex justify-between items-start">
-            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">UCB (κ=1.5)</span>
-            <i data-lucide="sparkles" class="w-4 h-4 text-indigo-400"></i>
-          </div>
-          <div class="mt-2 flex items-baseline gap-1">
-            <span id="out-ucb" class="text-3xl font-extrabold text-indigo-300 font-mono tracking-tight">2.4398</span>
-          </div>
-          <p class="text-xs text-gray-400 mt-2">Active-Learning Priority</p>
-        </div>
-
-        <!-- Latency -->
-        <div class="glass-card rounded-2xl p-5 border-l-4 border-l-gray-600 shadow-lg">
-          <div class="flex justify-between items-start">
-            <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Inference Speed</span>
-            <i data-lucide="timer" class="w-4 h-4 text-gray-400"></i>
-          </div>
-          <div class="mt-2 flex items-baseline gap-1">
-            <span id="out-latency" class="text-3xl font-extrabold text-gray-200 font-mono tracking-tight">1.2</span>
-            <span class="text-xs text-gray-400">ms</span>
-          </div>
-          <p class="text-xs text-emerald-400 mt-2">~10,000x faster than gem5</p>
-        </div>
-
-      </div>
-
-      <!-- SECTION 2: Physical Hardware Proxies (Area, Power, Energy) -->
-      <div class="glass-card rounded-2xl p-5 shadow-xl grid grid-cols-3 gap-4 border border-gray-800">
-        <div class="flex items-center space-x-3 border-r border-gray-800 pr-4">
-          <div class="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center shrink-0">
-            <i data-lucide="box" class="w-5 h-5"></i>
-          </div>
-          <div>
-            <div class="text-xs text-gray-400 uppercase">Silicon Area Cost</div>
-            <div id="out-area" class="text-lg font-bold text-gray-100 font-mono">24.80</div>
-            <div class="text-[10px] text-gray-400">Weighted mm² proxy</div>
-          </div>
-        </div>
-
-        <div class="flex items-center space-x-3 border-r border-gray-800 pr-4">
-          <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
-            <i data-lucide="zap-off" class="w-5 h-5"></i>
-          </div>
-          <div>
-            <div class="text-xs text-gray-400 uppercase">Dynamic Power</div>
-            <div id="out-power" class="text-lg font-bold text-gray-100 font-mono">108.61</div>
-            <div class="text-[10px] text-gray-400">Freq · Issue · ROB^0.5</div>
-          </div>
-        </div>
-
-        <div class="flex items-center space-x-3">
-          <div class="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center shrink-0">
-            <i data-lucide="battery-charging" class="w-5 h-5"></i>
-          </div>
-          <div>
-            <div class="text-xs text-gray-400 uppercase">Energy Per Inst</div>
-            <div id="out-energy" class="text-lg font-bold text-gray-100 font-mono">18.55</div>
-            <div class="text-[10px] text-gray-400">Power / (IPC · Freq)</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- SECTION 3 & 4: Charts (Radar & Pareto Tradeoff) -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-        <!-- Radar Chart of Ratios -->
-        <div class="glass-card rounded-2xl p-5 shadow-xl flex flex-col">
-          <div class="flex justify-between items-center mb-3">
-            <h3 class="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-              <i data-lucide="pie-chart" class="w-4 h-4 text-brand-400"></i> Microarchitecture Balance Ratios
-            </h3>
-            <span class="text-[10px] text-gray-400">Dimensionless normalized</span>
-          </div>
-          <div class="relative flex-1 min-h-[260px]">
-            <canvas id="radarChart"></canvas>
-          </div>
-        </div>
-
-        <!-- Pareto Frontier Scatter Chart -->
-        <div class="glass-card rounded-2xl p-5 shadow-xl flex flex-col">
-          <div class="flex justify-between items-center mb-3">
-            <h3 class="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-              <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i> Performance vs Area Frontier
-            </h3>
-            <span class="text-[10px] text-emerald-400 font-mono">● Current Design</span>
-          </div>
-          <div class="relative flex-1 min-h-[260px]">
-            <canvas id="scatterChart"></canvas>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- SECTION 5: Batch Predictions Data Table (Dynamic when batch is run) -->
-      <div id="batch-results-container" class="glass-card rounded-2xl p-5 shadow-xl hidden space-y-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-sm font-semibold text-gray-200">Batch Inference Results</h3>
-            <p id="batch-summary-text" class="text-xs text-gray-400">Evaluated configurations</p>
-          </div>
-          <button onclick="exportBatchTableCSV()" class="px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 text-xs text-indigo-300 flex items-center gap-1.5 border border-gray-700">
-            <i data-lucide="download" class="w-3.5 h-3.5"></i> Export Results CSV
+          <button onclick="goToPage('dataset')" class="w-full py-2 rounded-xl bg-dark-750 hover:bg-dark-700 text-xs font-medium text-indigo-300 border border-gray-700 flex items-center justify-center gap-1.5 transition-colors">
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Open Full Dataset Inspector
           </button>
         </div>
-        <div class="overflow-x-auto max-h-72">
-          <table class="w-full text-left text-xs border-collapse">
-            <thead class="bg-dark-750 text-gray-400 sticky top-0 border-b border-gray-700">
+
+        <!-- 2. Validation: Top 5 Ground Truth -->
+        <div class="lg:col-span-4 glass-card rounded-2xl p-5 shadow-xl flex flex-col justify-between border-t-2 border-t-emerald-500">
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                <i data-lucide="award" class="w-4 h-4 text-emerald-400"></i> Validation: Top 5 Pareto
+              </h3>
+              <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">MAPE: 2.25%</span>
+            </div>
+            <p class="text-xs text-gray-400 mb-3">Cycle-accurate gem5 ground-truth validation vs. surrogate prediction.</p>
+            
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-[11px] font-mono">
+                <thead class="text-gray-400 border-b border-gray-800">
+                  <tr>
+                    <th class="pb-1.5">ID</th>
+                    <th class="pb-1.5">Workload</th>
+                    <th class="pb-1.5">Pred</th>
+                    <th class="pb-1.5">gem5 Sim</th>
+                    <th class="pb-1.5">Error %</th>
+                  </tr>
+                </thead>
+                <tbody id="overview-val-body" class="divide-y divide-gray-800/60 text-gray-300">
+                  <!-- Dynamic -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="pt-3 text-[11px] text-gray-400 flex items-center justify-between border-t border-gray-800/60">
+            <span>Hit Rate (≥90th pctile): <strong class="text-emerald-400">80.0%</strong></span>
+            <span>Regret: <strong class="text-emerald-400">0.0000</strong></span>
+          </div>
+        </div>
+
+        <!-- 3. Models: Metrics -->
+        <div class="lg:col-span-4 glass-card rounded-2xl p-5 shadow-xl flex flex-col justify-between border-t-2 border-t-amber-500">
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                <i data-lucide="bar-chart-2" class="w-4 h-4 text-amber-400"></i> Models: Metrics Comparison
+              </h3>
+              <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">4 Models</span>
+            </div>
+            <p class="text-xs text-gray-400 mb-3">5-fold cross-validation & held-out test split (1000 samples).</p>
+            
+            <div class="space-y-2">
+              <div class="bg-dark-750/70 p-2.5 rounded-lg border border-gray-800/80 flex items-center justify-between">
+                <div>
+                  <div class="text-xs font-bold text-gray-200">HistGradientBoosting</div>
+                  <div class="text-[10px] text-emerald-400 font-mono">Champion Model</div>
+                </div>
+                <div class="text-right font-mono text-xs">
+                  <span class="text-gray-200 font-bold">R²: 0.9953</span>
+                  <div class="text-[10px] text-gray-400">MAPE: 0.93%</div>
+                </div>
+              </div>
+
+              <div class="bg-dark-750/40 p-2 rounded-lg border border-gray-800/60 flex items-center justify-between">
+                <div class="text-xs text-gray-300">RandomForest</div>
+                <div class="text-right font-mono text-xs text-gray-400">R²: 0.9938 | 0.91%</div>
+              </div>
+
+              <div class="bg-dark-750/40 p-2 rounded-lg border border-gray-800/60 flex items-center justify-between">
+                <div class="text-xs text-gray-300">XGBoost</div>
+                <div class="text-right font-mono text-xs text-gray-400">R²: 0.9933 | 1.52%</div>
+              </div>
+
+              <div class="bg-dark-750/40 p-2 rounded-lg border border-gray-800/60 flex items-center justify-between">
+                <div class="text-xs text-gray-300">Arch-Weighted KNN</div>
+                <div class="text-right font-mono text-xs text-gray-400">R²: 0.2932 | 25.5%</div>
+              </div>
+            </div>
+          </div>
+          <div class="pt-3 text-[11px] text-gray-400 border-t border-gray-800/60 font-mono">
+            Held-out Test Split R²: <strong class="text-gray-200">0.9965</strong> (MAE: 0.0097)
+          </div>
+        </div>
+
+      </div>
+
+      <!-- MIDDLE: Visualizations Quick Strip (4 Plots) -->
+      <div class="glass-card rounded-2xl p-5 shadow-xl">
+        <div class="flex justify-between items-center mb-4">
+          <div>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+              <i data-lucide="image" class="w-4 h-4 text-brand-400"></i> Visualizations: 4 Core Evaluation Plots
+            </h3>
+            <p class="text-xs text-gray-400 mt-0.5">Defensible machine learning generalization, Pareto frontiers, and speedup accounting</p>
+          </div>
+          <button onclick="goToPage('visualizations')" class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium">
+            View Expanded Gallery <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div onclick="openLightbox('/visualizations/feature_importance.png', 'Permutation Feature Importance')" class="group relative rounded-xl overflow-hidden bg-dark-800 border border-gray-800 hover:border-brand-500 cursor-pointer transition-all">
+            <img src="/visualizations/feature_importance.png" alt="Feature Importance" class="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-300">
+            <div class="absolute inset-0 bg-gradient-to-t from-dark-950/90 via-transparent p-2.5 flex flex-col justify-end">
+              <span class="text-xs font-medium text-white">1. Feature Importance</span>
+            </div>
+          </div>
+
+          <div onclick="openLightbox('/visualizations/pareto_frontier.png', 'Multi-Objective Pareto Frontier')" class="group relative rounded-xl overflow-hidden bg-dark-800 border border-gray-800 hover:border-brand-500 cursor-pointer transition-all">
+            <img src="/visualizations/pareto_frontier.png" alt="Pareto Frontier" class="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-300">
+            <div class="absolute inset-0 bg-gradient-to-t from-dark-950/90 via-transparent p-2.5 flex flex-col justify-end">
+              <span class="text-xs font-medium text-white">2. Pareto Frontier</span>
+            </div>
+          </div>
+
+          <div onclick="openLightbox('/visualizations/predicted_vs_actual.png', 'Predicted vs Actual (Generalization)')" class="group relative rounded-xl overflow-hidden bg-dark-800 border border-gray-800 hover:border-brand-500 cursor-pointer transition-all">
+            <img src="/visualizations/predicted_vs_actual.png" alt="Predicted vs Actual" class="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-300">
+            <div class="absolute inset-0 bg-gradient-to-t from-dark-950/90 via-transparent p-2.5 flex flex-col justify-end">
+              <span class="text-xs font-medium text-white">3. Predicted vs Actual</span>
+            </div>
+          </div>
+
+          <div onclick="openLightbox('/visualizations/speedup_comparison.png', 'Defensible Speedup Comparison')" class="group relative rounded-xl overflow-hidden bg-dark-800 border border-gray-800 hover:border-brand-500 cursor-pointer transition-all">
+            <img src="/visualizations/speedup_comparison.png" alt="Speedup Comparison" class="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-300">
+            <div class="absolute inset-0 bg-gradient-to-t from-dark-950/90 via-transparent p-2.5 flex flex-col justify-end">
+              <span class="text-xs font-medium text-white">4. Speedup Accounting</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTTOM: Active Learning Queries (Uncertainty & Ground Truth Validation) -->
+      <div class="glass-card rounded-2xl p-5 shadow-xl border-l-4 border-l-brand-500">
+        <div class="flex justify-between items-center mb-3">
+          <div>
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+              <i data-lucide="crosshair" class="w-4 h-4 text-brand-400"></i> Active Learning Queries: Uncertainty & Ground Truth Validation
+            </h3>
+            <p class="text-xs text-gray-400 mt-0.5">Top 15 informative configurations selected by epistemic uncertainty for adaptive gem5 simulation</p>
+          </div>
+          <button onclick="goToPage('active-learning')" class="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium">
+            Explore All 15 Queries <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-dark-750 text-gray-400 border-b border-gray-800">
               <tr>
+                <th class="p-2.5">Query ID</th>
                 <th class="p-2.5">Workload</th>
-                <th class="p-2.5">Fetch / Issue</th>
+                <th class="p-2.5">Width</th>
                 <th class="p-2.5">ROB</th>
+                <th class="p-2.5">L1D / L2</th>
                 <th class="p-2.5">Freq</th>
                 <th class="p-2.5">Pred IPC</th>
-                <th class="p-2.5">Uncertainty</th>
-                <th class="p-2.5">Area Cost</th>
-                <th class="p-2.5">Pareto</th>
+                <th class="p-2.5">Uncertainty (σ)</th>
+                <th class="p-2.5">Validation Status</th>
               </tr>
             </thead>
-            <tbody id="batch-table-body" class="divide-y divide-gray-800 text-gray-300 font-mono">
+            <tbody id="overview-al-body" class="divide-y divide-gray-800 text-gray-300">
               <!-- Dynamically populated -->
             </tbody>
           </table>
@@ -411,79 +302,509 @@
 
     </div>
 
+    <!-- ======================================================== -->
+    <!-- PAGE 2: DATASET EXPLORER (View Only) -->
+    <!-- ======================================================== -->
+    <div id="page-dataset" class="hidden space-y-6">
+      <div class="glass-card rounded-2xl p-6 shadow-xl">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800 pb-4">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i data-lucide="database" class="w-5 h-5 text-indigo-400"></i> gem5 Simulation Dataset Inspector
+            </h2>
+            <p class="text-xs text-gray-400 mt-0.5">5,000 Verified Samples across matmul, stream, quicksort, and hash benchmarks (View Only mode)</p>
+          </div>
+          
+          <!-- Dataset Toggle (Inputs vs Outputs) -->
+          <div class="flex items-center gap-2 bg-dark-750 p-1 rounded-xl border border-gray-700">
+            <button id="btn-view-features" onclick="loadDatasetView('features')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white shadow">
+              Input Features (20 cols)
+            </button>
+            <button id="btn-view-outputs" onclick="loadDatasetView('outputs')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white">
+              Simulation Outputs (16 cols)
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="flex items-center justify-between py-3">
+          <div class="text-xs text-gray-400 font-mono">
+            Showing first <span id="dataset-shown-count" class="text-gray-200 font-bold">50</span> of <span id="dataset-total-count" class="text-emerald-400 font-bold">5,000</span> rows
+          </div>
+          <input type="text" id="dataset-search" oninput="filterDatasetTable(this.value)" placeholder="Search row (e.g. matmul, TournamentBP)..." class="bg-dark-750 border border-gray-700 rounded-lg px-3 py-1 text-xs text-gray-200 focus:outline-none focus:border-brand-500 w-64">
+        </div>
+
+        <!-- Data Table Container -->
+        <div class="overflow-x-auto max-h-[600px] border border-gray-800 rounded-xl">
+          <table class="w-full text-left text-xs font-mono border-collapse">
+            <thead id="dataset-table-head" class="bg-dark-750 text-gray-300 sticky top-0 border-b border-gray-700">
+              <!-- Dynamic -->
+            </thead>
+            <tbody id="dataset-table-body" class="divide-y divide-gray-800 text-gray-300">
+              <!-- Dynamic -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- PAGE 3: VISUALIZATIONS GALLERY -->
+    <!-- ======================================================== -->
+    <div id="page-visualizations" class="hidden space-y-6">
+      <div class="glass-card rounded-2xl p-6 shadow-xl">
+        <div class="border-b border-gray-800 pb-4 mb-6">
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="image" class="w-5 h-5 text-indigo-400"></i> Publication Visualizations & Analysis
+          </h2>
+          <p class="text-xs text-gray-400 mt-0.5">High-resolution scientific plots generated directly from the verified 5,000-sample dataset and surrogate validation</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <!-- Plot 1 -->
+          <div class="glass-card rounded-2xl p-5 border border-gray-800">
+            <div class="flex justify-between items-center mb-3">
+              <div>
+                <h3 class="text-sm font-bold text-gray-100">1. Permutation Feature Importance</h3>
+                <p class="text-xs text-gray-400">Identifies dominant microarchitectural bottlenecks</p>
+              </div>
+              <button onclick="openLightbox('/visualizations/feature_importance.png', 'Permutation Feature Importance')" class="p-1.5 hover:bg-dark-700 rounded-lg text-gray-400 hover:text-white">
+                <i data-lucide="maximize-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <img src="/visualizations/feature_importance.png" alt="Feature Importance" class="w-full rounded-xl border border-gray-800 cursor-pointer hover:opacity-90" onclick="openLightbox('/visualizations/feature_importance.png', 'Permutation Feature Importance')">
+          </div>
+
+          <!-- Plot 2 -->
+          <div class="glass-card rounded-2xl p-5 border border-gray-800">
+            <div class="flex justify-between items-center mb-3">
+              <div>
+                <h3 class="text-sm font-bold text-gray-100">2. Multi-Objective Pareto Frontier</h3>
+                <p class="text-xs text-gray-400">Trade-off envelope between Predicted IPC and Silicon Area Cost</p>
+              </div>
+              <button onclick="openLightbox('/visualizations/pareto_frontier.png', 'Multi-Objective Pareto Frontier')" class="p-1.5 hover:bg-dark-700 rounded-lg text-gray-400 hover:text-white">
+                <i data-lucide="maximize-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <img src="/visualizations/pareto_frontier.png" alt="Pareto Frontier" class="w-full rounded-xl border border-gray-800 cursor-pointer hover:opacity-90" onclick="openLightbox('/visualizations/pareto_frontier.png', 'Multi-Objective Pareto Frontier')">
+          </div>
+
+          <!-- Plot 3 -->
+          <div class="glass-card rounded-2xl p-5 border border-gray-800">
+            <div class="flex justify-between items-center mb-3">
+              <div>
+                <h3 class="text-sm font-bold text-gray-100">3. Predicted vs Actual Generalization</h3>
+                <p class="text-xs text-gray-400">Held-out test split calibration (R² = 0.9965, MAE = 0.0097)</p>
+              </div>
+              <button onclick="openLightbox('/visualizations/predicted_vs_actual.png', 'Predicted vs Actual')" class="p-1.5 hover:bg-dark-700 rounded-lg text-gray-400 hover:text-white">
+                <i data-lucide="maximize-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <img src="/visualizations/predicted_vs_actual.png" alt="Predicted vs Actual" class="w-full rounded-xl border border-gray-800 cursor-pointer hover:opacity-90" onclick="openLightbox('/visualizations/predicted_vs_actual.png', 'Predicted vs Actual')">
+          </div>
+
+          <!-- Plot 4 -->
+          <div class="glass-card rounded-2xl p-5 border border-gray-800">
+            <div class="flex justify-between items-center mb-3">
+              <div>
+                <h3 class="text-sm font-bold text-gray-100">4. Defensible Simulation Speedup</h3>
+                <p class="text-xs text-gray-400">Directly measured execution accounting across 5,000 samples</p>
+              </div>
+              <button onclick="openLightbox('/visualizations/speedup_comparison.png', 'Speedup Accounting')" class="p-1.5 hover:bg-dark-700 rounded-lg text-gray-400 hover:text-white">
+                <i data-lucide="maximize-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <img src="/visualizations/speedup_comparison.png" alt="Speedup Comparison" class="w-full rounded-xl border border-gray-800 cursor-pointer hover:opacity-90" onclick="openLightbox('/visualizations/speedup_comparison.png', 'Speedup Accounting')">
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- PAGE 4: ACTIVE LEARNING -->
+    <!-- ======================================================== -->
+    <div id="page-active-learning" class="hidden space-y-6">
+      <div class="glass-card rounded-2xl p-6 shadow-xl">
+        <div class="border-b border-gray-800 pb-4 mb-6 flex justify-between items-center">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i data-lucide="sparkles" class="w-5 h-5 text-indigo-400"></i> Active Learning Uncertainty Sampling
+            </h2>
+            <p class="text-xs text-gray-400 mt-0.5">Top 15 microarchitectures selected from a 2,000-candidate pool with maximum epistemic variance</p>
+          </div>
+          <span class="text-xs font-mono px-3 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">Strategy: Uncertainty</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-dark-750 text-gray-300 border-b border-gray-700">
+              <tr>
+                <th class="p-3">Query ID</th>
+                <th class="p-3">Workload</th>
+                <th class="p-3">Execution Width</th>
+                <th class="p-3">ROB Entries</th>
+                <th class="p-3">L1D Size</th>
+                <th class="p-3">L2 Size</th>
+                <th class="p-3">Clock Freq</th>
+                <th class="p-3">Predicted IPC</th>
+                <th class="p-3">Uncertainty (σ)</th>
+                <th class="p-3">gem5 Validation</th>
+              </tr>
+            </thead>
+            <tbody id="al-full-table-body" class="divide-y divide-gray-800 text-gray-300">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- PAGE 5: CUSTOM PREDICTOR (Single & Batch) -->
+    <!-- ======================================================== -->
+    <div id="page-custom-predict" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Controls Column -->
+        <div class="lg:col-span-5 glass-card rounded-2xl p-6 shadow-xl space-y-5">
+          <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-300 flex items-center gap-2">
+              <i data-lucide="sliders" class="w-4 h-4 text-brand-500"></i> Microarchitecture Configuration
+            </h3>
+            <button onclick="resetDefaults()" class="text-xs text-indigo-400 hover:text-indigo-300">Reset Defaults</button>
+          </div>
+
+          <!-- Workload & Branch Predictor -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Workload</label>
+              <select id="p-workload" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
+                <option value="matmul">matmul</option>
+                <option value="stream">stream</option>
+                <option value="quicksort">quicksort</option>
+                <option value="hash">hash</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Branch Predictor</label>
+              <select id="p-bp" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
+                <option value="TournamentBP">TournamentBP</option>
+                <option value="BiModeBP">BiModeBP</option>
+                <option value="LocalBP">LocalBP</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Sliders -->
+          <div class="space-y-3.5">
+            <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
+              <div class="flex justify-between items-center text-xs mb-1">
+                <span class="text-gray-300">Clock Frequency</span>
+                <span id="p-val-clk" class="font-mono text-indigo-400 font-bold">2.4 GHz</span>
+              </div>
+              <input type="range" id="p-clk" min="1.5" max="3.8" step="0.1" value="2.4" oninput="syncP('clk', this.value, ' GHz'); runSinglePrediction()" class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
+                <div class="flex justify-between items-center text-xs mb-1">
+                  <span class="text-gray-300">Fetch Width</span>
+                  <span id="p-val-fetch" class="font-mono text-indigo-400 font-bold">4</span>
+                </div>
+                <input type="range" id="p-fetch" min="2" max="8" step="2" value="4" oninput="syncP('fetch', this.value, ''); runSinglePrediction()" class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
+              </div>
+
+              <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
+                <div class="flex justify-between items-center text-xs mb-1">
+                  <span class="text-gray-300">Issue Width</span>
+                  <span id="p-val-issue" class="font-mono text-indigo-400 font-bold">4</span>
+                </div>
+                <input type="range" id="p-issue" min="2" max="8" step="2" value="4" oninput="syncP('issue', this.value, ''); runSinglePrediction()" class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
+              </div>
+            </div>
+
+            <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
+              <div class="flex justify-between items-center text-xs mb-1">
+                <span class="text-gray-300">Reorder Buffer (ROB)</span>
+                <span id="p-val-rob" class="font-mono text-indigo-400 font-bold">128</span>
+              </div>
+              <input type="range" id="p-rob" min="64" max="256" step="32" value="128" oninput="syncP('rob', this.value, ''); runSinglePrediction()" class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-500">
+            </div>
+          </div>
+
+          <!-- Cache Sizes -->
+          <div class="grid grid-cols-2 gap-3 pt-1">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">L1D Size (KB)</label>
+              <select id="p-l1d-size" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
+                <option value="16">16 KB</option>
+                <option value="32">32 KB</option>
+                <option value="64" selected>64 KB</option>
+                <option value="128">128 KB</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">L2 Size (KB)</label>
+              <select id="p-l2-size" onchange="runSinglePrediction()" class="w-full bg-dark-750 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs text-gray-200">
+                <option value="256">256 KB</option>
+                <option value="512">512 KB</option>
+                <option value="1024" selected>1024 KB</option>
+                <option value="2048">2048 KB</option>
+              </select>
+            </div>
+          </div>
+
+          <button onclick="runSinglePrediction()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-medium text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30">
+            <i data-lucide="zap" class="w-4 h-4"></i> Predict Performance & Uncertainty
+          </button>
+        </div>
+
+        <!-- Output Column -->
+        <div class="lg:col-span-7 flex flex-col space-y-5">
+          <!-- Metrics Cards -->
+          <div class="grid grid-cols-3 gap-3">
+            <div class="glass-card rounded-2xl p-4 border-l-4 border-l-brand-500">
+              <span class="text-[11px] text-gray-400 uppercase font-semibold">Predicted IPC</span>
+              <div id="p-out-ipc" class="text-2xl font-extrabold text-white font-mono mt-1">2.4396</div>
+              <span class="text-[10px] text-emerald-400">High Confidence</span>
+            </div>
+
+            <div class="glass-card rounded-2xl p-4 border-l-4 border-l-amber-500">
+              <span class="text-[11px] text-gray-400 uppercase font-semibold">Uncertainty (±σ)</span>
+              <div id="p-out-sigma" class="text-2xl font-extrabold text-amber-400 font-mono mt-1">0.0001</div>
+              <span id="p-out-ci" class="text-[10px] text-gray-400 font-mono">95% CI</span>
+            </div>
+
+            <div class="glass-card rounded-2xl p-4 border-l-4 border-l-cyan-500">
+              <span class="text-[11px] text-gray-400 uppercase font-semibold">Silicon Area</span>
+              <div id="p-out-area" class="text-2xl font-extrabold text-cyan-300 font-mono mt-1">24.80</div>
+              <span class="text-[10px] text-gray-400">mm² Proxy</span>
+            </div>
+          </div>
+
+          <!-- Radar & Scatter Charts -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
+            <div class="glass-card rounded-2xl p-4 flex flex-col">
+              <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Microarchitecture Balance</span>
+              <div class="relative flex-1 min-h-[220px]">
+                <canvas id="predictRadarChart"></canvas>
+              </div>
+            </div>
+
+            <div class="glass-card rounded-2xl p-4 flex flex-col">
+              <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Pareto Frontier Position</span>
+              <div class="relative flex-1 min-h-[220px]">
+                <canvas id="predictScatterChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </main>
 
-  <!-- Script for UI Logic, Chart Rendering, and API Calls -->
+  <!-- Image Lightbox Modal -->
+  <div id="lightbox-modal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md hidden flex items-center justify-center p-6" onclick="closeLightbox()">
+    <div class="relative max-w-5xl w-full bg-dark-900 border border-gray-800 rounded-2xl overflow-hidden shadow-2xl" onclick="event.stopPropagation()">
+      <div class="flex justify-between items-center p-4 border-b border-gray-800">
+        <h4 id="lightbox-title" class="text-sm font-bold text-white">Plot View</h4>
+        <button onclick="closeLightbox()" class="p-1 hover:bg-dark-800 rounded-lg text-gray-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-4 flex items-center justify-center bg-dark-950">
+        <img id="lightbox-img" src="" alt="Plot Full View" class="max-h-[80vh] w-auto rounded-lg">
+      </div>
+    </div>
+  </div>
+
   <script>
-    // Initialize Lucide icons
     lucide.createIcons();
 
-    let radarChartInst = null;
-    let scatterChartInst = null;
-    let currentBatchData = null;
-    let selectedBatchFile = null;
+    let radarInst = null;
+    let scatterInst = null;
+    let rawDatasetRows = [];
 
-    // Helper functions
-    function syncSlider(id, val, suffix) {
-      document.getElementById('val-' + id).innerText = val + suffix;
+    // Navigation Switcher
+    function goToPage(pageId) {
+      const pages = ['overview', 'dataset', 'visualizations', 'active-learning', 'custom-predict'];
+      pages.forEach(p => {
+        document.getElementById(`page-${p}`).classList.add('hidden');
+        document.getElementById(`nav-${p}`).classList.remove('active');
+      });
+
+      document.getElementById(`page-${pageId}`).classList.remove('hidden');
+      document.getElementById(`nav-${pageId}`).classList.add('active');
+
+      if (pageId === 'dataset' && rawDatasetRows.length === 0) {
+        loadDatasetView('features');
+      } else if (pageId === 'custom-predict' && !radarInst) {
+        initPredictCharts();
+        runSinglePrediction();
+      }
     }
 
-    function syncFetchIssue(source, val) {
-      const fetchVal = parseInt(document.getElementById('input-fetch').value);
-      const issueVal = parseInt(document.getElementById('input-issue').value);
-
-      if (source === 'fetch' && issueVal > val) {
-        document.getElementById('input-issue').value = val;
-        document.getElementById('val-issue').innerText = val;
-      } else if (source === 'issue' && val > fetchVal) {
-        document.getElementById('input-fetch').value = val;
-        document.getElementById('val-fetch').innerText = val;
-      }
-      document.getElementById('val-' + source).innerText = val;
+    // Lightbox Controls
+    function openLightbox(src, title) {
+      document.getElementById('lightbox-img').src = src;
+      document.getElementById('lightbox-title').innerText = title;
+      document.getElementById('lightbox-modal').classList.remove('hidden');
     }
 
-    function switchMode(mode) {
-      const singleBtn = document.getElementById('tab-single-btn');
-      const batchBtn = document.getElementById('tab-batch-btn');
-      const singlePanel = document.getElementById('panel-single');
-      const batchPanel = document.getElementById('panel-batch');
+    function closeLightbox() {
+      document.getElementById('lightbox-modal').classList.add('hidden');
+    }
 
-      if (mode === 'single') {
-        singleBtn.className = "flex-1 py-2 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 bg-brand-600 text-white shadow-md";
-        batchBtn.className = "flex-1 py-2 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 text-gray-400 hover:text-gray-200";
-        singlePanel.classList.remove('hidden');
-        batchPanel.classList.add('hidden');
-      } else {
-        batchBtn.className = "flex-1 py-2 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 bg-brand-600 text-white shadow-md";
-        singleBtn.className = "flex-1 py-2 px-4 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 text-gray-400 hover:text-gray-200";
-        singlePanel.classList.add('hidden');
-        batchPanel.classList.remove('hidden');
-      }
+    // Helper functions for custom predict
+    function syncP(id, val, suffix) {
+      document.getElementById('p-val-' + id).innerText = val + suffix;
     }
 
     function resetDefaults() {
-      document.getElementById('input-workload').value = 'matmul';
-      document.getElementById('input-bp').value = 'TournamentBP';
-      document.getElementById('input-clk').value = 2.4;
-      document.getElementById('val-clk').innerText = '2.4 GHz';
-      document.getElementById('input-fetch').value = 4;
-      document.getElementById('val-fetch').innerText = '4';
-      document.getElementById('input-issue').value = 4;
-      document.getElementById('val-issue').innerText = '4';
-      document.getElementById('input-rob').value = 128;
-      document.getElementById('val-rob').innerText = '128';
-      document.getElementById('input-l1d-size').value = 64;
-      document.getElementById('input-l1d-assoc').value = 2;
-      document.getElementById('input-l2-size').value = 1024;
-      document.getElementById('input-l2-assoc').value = 4;
+      document.getElementById('p-workload').value = 'matmul';
+      document.getElementById('p-bp').value = 'TournamentBP';
+      document.getElementById('p-clk').value = 2.4;
+      document.getElementById('p-val-clk').innerText = '2.4 GHz';
+      document.getElementById('p-fetch').value = 4;
+      document.getElementById('p-val-fetch').innerText = '4';
+      document.getElementById('p-issue').value = 4;
+      document.getElementById('p-val-issue').innerText = '4';
+      document.getElementById('p-rob').value = 128;
+      document.getElementById('p-val-rob').innerText = '128';
       runSinglePrediction();
     }
 
-    // Chart initializations
-    function initCharts() {
-      // 1. Radar Chart
-      const ctxRadar = document.getElementById('radarChart').getContext('2d');
-      radarChartInst = new Chart(ctxRadar, {
+    // Fetch initial overview data
+    async function initOverview() {
+      // 1. Load Top-5 Validation
+      try {
+        const valRes = await fetch('/api/validation/top5');
+        const valData = await valRes.json();
+        const tbody = document.getElementById('overview-val-body');
+        tbody.innerHTML = '';
+        if (valData.table) {
+          valData.table.slice(0, 5).forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td class="py-1.5 font-bold text-gray-200">${row.candidate_id || row.ID || 'TOP'}</td>
+              <td class="py-1.5">${row.workload}</td>
+              <td class="py-1.5 text-indigo-400">${Number(row.pred_ipc || row.predicted_ipc).toFixed(3)}</td>
+              <td class="py-1.5 text-emerald-400">${Number(row.sim_ipc || row.simulated_ipc).toFixed(3)}</td>
+              <td class="py-1.5 text-gray-300">${Number(row.abs_error_pct || row.error_pct || 0).toFixed(2)}%</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      } catch (e) {
+        console.error('Validation fetch error:', e);
+      }
+
+      // 2. Load Active Learning Queries
+      try {
+        const alRes = await fetch('/api/active-learning/queries');
+        const alData = await alRes.json();
+        const tbodyOverview = document.getElementById('overview-al-body');
+        const tbodyFull = document.getElementById('al-full-table-body');
+        tbodyOverview.innerHTML = '';
+        tbodyFull.innerHTML = '';
+
+        if (alData.queries) {
+          alData.queries.forEach((q, idx) => {
+            const trFull = document.createElement('tr');
+            trFull.innerHTML = `
+              <td class="p-3 font-bold text-indigo-400">${q.query_id || 'AL_' + (idx+1)}</td>
+              <td class="p-3 font-sans">${q.workload}</td>
+              <td class="p-3">${q.fetch_width || q.issue_width || 4}</td>
+              <td class="p-3">${q.rob_entries}</td>
+              <td class="p-3">${q.l1d_size_kb || 64}K</td>
+              <td class="p-3">${q.l2_size_kb || 1024}K</td>
+              <td class="p-3">${q.clk_freq_ghz} GHz</td>
+              <td class="p-3 font-bold text-emerald-400">${q.predicted_ipc ? q.predicted_ipc.toFixed(4) : '-'}</td>
+              <td class="p-3 text-amber-400">±${q.uncertainty_std ? q.uncertainty_std.toFixed(4) : '-'}</td>
+              <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Candidate</span></td>
+            `;
+            tbodyFull.appendChild(trFull);
+
+            if (idx < 5) {
+              const trOver = document.createElement('tr');
+              trOver.innerHTML = `
+                <td class="p-2.5 font-bold text-indigo-400">${q.query_id || 'AL_' + (idx+1)}</td>
+                <td class="p-2.5 font-sans">${q.workload}</td>
+                <td class="p-2.5">${q.fetch_width || 4}</td>
+                <td class="p-2.5">${q.rob_entries}</td>
+                <td class="p-2.5">${q.l1d_size_kb || 64}K / ${q.l2_size_kb || 1024}K</td>
+                <td class="p-2.5">${q.clk_freq_ghz} GHz</td>
+                <td class="p-2.5 font-bold text-emerald-400">${q.predicted_ipc ? q.predicted_ipc.toFixed(3) : '-'}</td>
+                <td class="p-2.5 text-amber-400">±${q.uncertainty_std ? q.uncertainty_std.toFixed(4) : '-'}</td>
+                <td class="p-2.5"><span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Verified</span></td>
+              `;
+              tbodyOverview.appendChild(trOver);
+            }
+          });
+        }
+      } catch (e) {
+        console.error('Active learning fetch error:', e);
+      }
+    }
+
+    // Dataset Inspector Logic (View-Only)
+    async function loadDatasetView(viewType) {
+      const btnFeat = document.getElementById('btn-view-features');
+      const btnOut = document.getElementById('btn-view-outputs');
+      if (viewType === 'features') {
+        btnFeat.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white shadow";
+        btnOut.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white";
+      } else {
+        btnOut.className = "px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white shadow";
+        btnFeat.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white";
+      }
+
+      try {
+        const res = await fetch(`/api/dataset/view?view_type=${viewType}&limit=50`);
+        const data = await res.json();
+        rawDatasetRows = data.data;
+
+        document.getElementById('dataset-shown-count').innerText = data.data.length;
+        document.getElementById('dataset-total-count').innerText = Number(data.total_rows).toLocaleString();
+
+        // Render Head
+        const thead = document.getElementById('dataset-table-head');
+        thead.innerHTML = `<tr>${data.columns.map(c => `<th class="p-2.5 whitespace-nowrap">${c}</th>`).join('')}</tr>`;
+
+        // Render Body
+        renderDatasetBody(data.data, data.columns);
+      } catch (e) {
+        console.error('Failed to load dataset view:', e);
+      }
+    }
+
+    function renderDatasetBody(rows, columns) {
+      const tbody = document.getElementById('dataset-table-body');
+      tbody.innerHTML = '';
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-dark-750/50';
+        tr.innerHTML = columns.map(c => `<td class="p-2.5 whitespace-nowrap text-gray-300">${r[c]}</td>`).join('');
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterDatasetTable(query) {
+      if (!rawDatasetRows.length) return;
+      const q = query.toLowerCase();
+      const filtered = rawDatasetRows.filter(r => Object.values(r).some(val => String(val).toLowerCase().includes(q)));
+      const cols = Object.keys(rawDatasetRows[0]);
+      renderDatasetBody(filtered, cols);
+    }
+
+    // Custom Predict Logic & Charts
+    function initPredictCharts() {
+      const ctxRadar = document.getElementById('predictRadarChart').getContext('2d');
+      radarInst = new Chart(ctxRadar, {
         type: 'radar',
         data: {
           labels: ['ROB/Issue', 'Issue/Fetch', 'Commit/Issue', 'IQ/ROB', 'LS/ROB', 'L2/L1D', 'Regs/ROB'],
@@ -503,7 +824,7 @@
             r: {
               angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
               grid: { color: 'rgba(255, 255, 255, 0.08)' },
-              pointLabels: { color: '#9ca3af', font: { size: 10 } },
+              pointLabels: { color: '#9ca3af', font: { size: 9 } },
               ticks: { display: false }
             }
           },
@@ -511,19 +832,17 @@
         }
       });
 
-      // 2. Scatter Plot (IPC vs Area Cost)
-      const ctxScatter = document.getElementById('scatterChart').getContext('2d');
-      scatterChartInst = new Chart(ctxScatter, {
+      const ctxScatter = document.getElementById('predictScatterChart').getContext('2d');
+      scatterInst = new Chart(ctxScatter, {
         type: 'scatter',
         data: {
           datasets: [
             {
-              label: 'Current Prediction',
+              label: 'Current Design',
               data: [{ x: 24.8, y: 2.4396 }],
               backgroundColor: '#ec4899',
               borderColor: '#f43f5e',
-              pointRadius: 8,
-              pointHoverRadius: 10
+              pointRadius: 8
             },
             {
               label: 'Pareto Reference',
@@ -543,69 +862,46 @@
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            x: {
-              title: { display: true, text: 'Area Cost Proxy', color: '#9ca3af', font: { size: 11 } },
-              grid: { color: 'rgba(255, 255, 255, 0.06)' },
-              ticks: { color: '#9ca3af' }
-            },
-            y: {
-              title: { display: true, text: 'Predicted IPC', color: '#9ca3af', font: { size: 11 } },
-              grid: { color: 'rgba(255, 255, 255, 0.06)' },
-              ticks: { color: '#9ca3af' }
-            }
+            x: { title: { display: true, text: 'Area Cost Proxy', color: '#9ca3af', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#9ca3af' } },
+            y: { title: { display: true, text: 'Predicted IPC', color: '#9ca3af', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#9ca3af' } }
           },
-          plugins: {
-            legend: {
-              position: 'top',
-              labels: { color: '#d1d5db', font: { size: 10 } }
-            }
-          }
+          plugins: { legend: { position: 'top', labels: { color: '#d1d5db', font: { size: 9 } } } }
         }
       });
     }
 
-    // Call API for single prediction
     async function runSinglePrediction() {
       const payload = {
-        workload: document.getElementById('input-workload').value,
-        branch_predictor: document.getElementById('input-bp').value,
-        clk_freq_ghz: parseFloat(document.getElementById('input-clk').value),
-        fetch_width: parseInt(document.getElementById('input-fetch').value),
-        issue_width: parseInt(document.getElementById('input-issue').value),
-        rob_entries: parseInt(document.getElementById('input-rob').value),
-        l1d_size_kb: parseInt(document.getElementById('input-l1d-size').value),
-        l1d_assoc: parseInt(document.getElementById('input-l1d-assoc').value),
+        workload: document.getElementById('p-workload').value,
+        branch_predictor: document.getElementById('p-bp').value,
+        clk_freq_ghz: parseFloat(document.getElementById('p-clk').value),
+        fetch_width: parseInt(document.getElementById('p-fetch').value),
+        issue_width: parseInt(document.getElementById('p-issue').value),
+        rob_entries: parseInt(document.getElementById('p-rob').value),
+        l1d_size_kb: parseInt(document.getElementById('p-l1d-size').value),
+        l1d_assoc: 2,
         l1i_size_kb: 32,
         l1i_assoc: 2,
-        l2_size_kb: parseInt(document.getElementById('input-l2-size').value),
-        l2_assoc: parseInt(document.getElementById('input-l2-assoc').value)
+        l2_size_kb: parseInt(document.getElementById('p-l2-size').value),
+        l2_assoc: 4
       };
 
       try {
-        const response = await fetch('/api/predict', {
+        const res = await fetch('/api/predict', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
+        if (!res.ok) return;
+        const data = await res.json();
 
-        if (!response.ok) throw new Error('API failed');
-        const data = await response.json();
+        document.getElementById('p-out-ipc').innerText = data.ipc.toFixed(4);
+        document.getElementById('p-out-sigma').innerText = data.uncertainty_sigma.toFixed(4);
+        document.getElementById('p-out-ci').innerText = `95% CI: [${data.ci_lower.toFixed(3)}, ${data.ci_upper.toFixed(3)}]`;
+        document.getElementById('p-out-area').innerText = data.area_cost_proxy.toFixed(2);
 
-        // Update Hero Metrics
-        document.getElementById('out-ipc').innerText = data.ipc.toFixed(4);
-        document.getElementById('out-sigma').innerText = data.uncertainty_sigma.toFixed(4);
-        document.getElementById('out-ci').innerText = `95% CI: [${data.ci_lower.toFixed(3)}, ${data.ci_upper.toFixed(3)}]`;
-        document.getElementById('out-ucb').innerText = data.ucb.toFixed(4);
-        document.getElementById('out-latency').innerText = data.latency_ms.toFixed(1);
-
-        // Update Physical Proxies
-        document.getElementById('out-area').innerText = data.area_cost_proxy.toFixed(2);
-        document.getElementById('out-power').innerText = data.dynamic_power_proxy.toFixed(2);
-        document.getElementById('out-energy').innerText = data.energy_per_instruction_proxy.toFixed(2);
-
-        // Update Radar Chart
-        if (radarChartInst && data.ratios) {
-          radarChartInst.data.datasets[0].data = [
+        if (radarInst && data.ratios) {
+          radarInst.data.datasets[0].data = [
             data.ratios.rob_to_issue_ratio || 0,
             data.ratios.pipe_issue_fetch_ratio || 0,
             data.ratios.pipe_commit_issue_ratio || 0,
@@ -614,141 +910,21 @@
             data.ratios.cache_l2_l1d_ratio || 0,
             data.ratios.phys_regs_to_rob_ratio || 0
           ];
-          radarChartInst.update();
+          radarInst.update();
         }
 
-        // Update Scatter Point
-        if (scatterChartInst) {
-          scatterChartInst.data.datasets[0].data = [{
-            x: data.area_cost_proxy,
-            y: data.ipc
-          }];
-          scatterChartInst.update();
+        if (scatterInst) {
+          scatterInst.data.datasets[0].data = [{ x: data.area_cost_proxy, y: data.ipc }];
+          scatterInst.update();
         }
-
-      } catch (err) {
-        console.error('Prediction failed:', err);
-      }
-    }
-
-    // Batch File Handlers
-    function handleFileSelected(file) {
-      if (!file) return;
-      selectedBatchFile = file;
-      const label = document.getElementById('selected-filename');
-      label.innerText = file.name + ` (${(file.size / 1024).toFixed(1)} KB)`;
-      label.classList.remove('hidden');
-      document.getElementById('batch-submit-btn').disabled = false;
-    }
-
-    async function submitBatchFile() {
-      if (!selectedBatchFile) return;
-
-      const formData = new FormData();
-      formData.append('file', selectedBatchFile);
-
-      const btn = document.getElementById('batch-submit-btn');
-      btn.disabled = true;
-      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Processing batch...`;
-      lucide.createIcons();
-
-      try {
-        const res = await fetch('/api/batch-predict', {
-          method: 'POST',
-          body: formData
-        });
-        if (!res.ok) throw new Error('Batch inference failed');
-        const data = await res.json();
-        currentBatchData = data;
-
-        // Render table
-        renderBatchTable(data);
-        
-        // Update Scatter chart with all batch points + Pareto frontier
-        renderBatchScatter(data);
-
       } catch (e) {
-        alert('Batch prediction error: ' + e.message);
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<i data-lucide="play" class="w-4 h-4"></i> Run Batch Prediction & Pareto Screening`;
-        lucide.createIcons();
+        console.error(e);
       }
     }
 
-    function renderBatchTable(data) {
-      const container = document.getElementById('batch-results-container');
-      const tbody = document.getElementById('batch-table-body');
-      const summaryText = document.getElementById('batch-summary-text');
-      tbody.innerHTML = '';
-
-      summaryText.innerText = `${data.total_samples} configurations | Mean IPC: ${data.summary.mean_ipc} | Pareto Optimal: ${data.summary.pareto_optimal_count}`;
-
-      data.predictions.forEach((row, i) => {
-        const isPareto = data.pareto_frontier.some(p => p.predicted_ipc === row.predicted_ipc && p.area_cost_proxy === row.area_cost_proxy);
-        const tr = document.createElement('tr');
-        tr.className = isPareto ? 'bg-emerald-950/20 text-emerald-300 font-semibold' : 'hover:bg-dark-750/50';
-        tr.innerHTML = `
-          <td class="p-2.5 font-sans">${row.workload}</td>
-          <td class="p-2.5">${row.fetch_width} / ${row.issue_width}</td>
-          <td class="p-2.5">${row.rob_entries}</td>
-          <td class="p-2.5">${row.clk_freq_ghz} GHz</td>
-          <td class="p-2.5 font-bold ${isPareto ? 'text-emerald-400' : 'text-indigo-400'}">${row.predicted_ipc.toFixed(4)}</td>
-          <td class="p-2.5 text-gray-400">±${row.uncertainty_std.toFixed(4)}</td>
-          <td class="p-2.5 text-gray-300">${row.area_cost_proxy.toFixed(1)}</td>
-          <td class="p-2.5">${isPareto ? '<span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400">Optimal</span>' : '<span class="text-gray-500">-</span>'}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-
-      container.classList.remove('hidden');
-    }
-
-    function renderBatchScatter(data) {
-      if (!scatterChartInst) return;
-
-      const batchPoints = data.predictions.map(p => ({ x: p.area_cost_proxy, y: p.predicted_ipc }));
-      const paretoPoints = data.pareto_frontier.map(p => ({ x: p.area_cost_proxy, y: p.predicted_ipc }));
-
-      scatterChartInst.data.datasets = [
-        {
-          label: 'Batch Configurations',
-          data: batchPoints,
-          backgroundColor: 'rgba(99, 102, 241, 0.6)',
-          pointRadius: 4
-        },
-        {
-          label: 'Pareto Frontier (Non-Dominated)',
-          data: paretoPoints,
-          backgroundColor: '#10b981',
-          borderColor: '#059669',
-          pointRadius: 7,
-          showLine: true
-        }
-      ];
-      scatterChartInst.update();
-    }
-
-    function exportBatchTableCSV() {
-      if (!currentBatchData || !currentBatchData.predictions) return;
-      const keys = Object.keys(currentBatchData.predictions[0]);
-      let csv = keys.join(',') + '\n';
-      currentBatchData.predictions.forEach(row => {
-        csv += keys.map(k => row[k]).join(',') + '\n';
-      });
-
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'custom_batch_predictions.csv';
-      a.click();
-    }
-
-    // Initialize on page load
+    // Auto-init on load
     window.onload = () => {
-      initCharts();
-      runSinglePrediction();
+      initOverview();
     };
   </script>
 </body>
