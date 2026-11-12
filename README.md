@@ -343,6 +343,30 @@ python3 ml/validate_and_evaluate.py \
 - `outputs/validation_results.csv` and `dataset/validation_results.csv`
 - `outputs/validation_summary.json` and `dataset/validation_summary.json`
 
+### Step 8: Predict Custom Microarchitectures (Single Design or Batch CSV)
+Predict Instructions Per Cycle (IPC), epistemic uncertainty ($\sigma$), 95% Confidence Intervals, and hardware area/power/energy cost proxies for arbitrary custom processor configurations without launching gem5 simulations:
+
+#### Option A: Predict Single Configuration via CLI Flags
+```bash
+python3 ml/predict_custom.py \
+  --workload matmul \
+  --fetch-width 8 \
+  --issue-width 8 \
+  --rob 256 \
+  --l1d-size 64 \
+  --l2-size 2048 \
+  --clk-freq 3.0
+```
+
+#### Option B: Predict Batch Configurations from CSV
+```bash
+python3 ml/predict_custom.py \
+  --csv examples/custom_inputs_template.csv \
+  --output-csv outputs/custom_predictions.csv \
+  --output-json outputs/custom_predictions.json
+```
+
+
 ---
 
 ## 🤖 Machine Learning Models
@@ -350,14 +374,20 @@ python3 ml/validate_and_evaluate.py \
 The framework evaluates three distinct regression algorithms to balance accuracy, training time, and uncertainty quantification:
 
 1. **Histogram-Based Gradient Boosting (`HistGradientBoostingRegressor`) — Champion Model**
-   - **Configuration**: 250 iterations, learning rate 0.08, minimum 5 samples per leaf.
-   - **Strengths**: Native binning of integer features, captures complex non-linear microarchitectural interactions, delivers lowest test error (MAPE 1.34%, $R^2$ 0.9938).
+   - **Configuration**: 300 iterations, learning rate 0.06, minimum 8 samples per leaf.
+   - **Performance**: Test $R^2 = 0.9965$, Held-out test $\text{MAPE} = 0.96\%$.
+   - **Strengths**: Native binning of integer features, captures complex non-linear microarchitectural interactions.
 2. **Random Forest Regressor (`RandomForestRegressor`)**
-   - **Configuration**: 200 estimators, max depth 12.
-   - **Strengths**: Computes ensemble variance across individual decision trees to estimate epistemic prediction uncertainty ($\sigma$), utilized by Upper Confidence Bound (UCB) candidate screening.
-3. **K-Nearest Neighbors (`KNeighborsRegressor`)**
-   - **Configuration**: $k=5$ neighbors, distance-weighted Euclidean interpolation.
-   - **Role**: Non-parametric baseline capturing local design neighborhood continuity.
+   - **Configuration**: 300 estimators, max depth 16, min samples leaf 2.
+   - **Performance**: 5-fold CV $R^2 = 0.9938$, $\text{MAPE} = 0.91\%$.
+   - **Strengths**: Computes ensemble variance across decision trees to estimate epistemic prediction uncertainty ($\sigma$).
+3. **Extreme Gradient Boosting (`XGBoostRegressor`)**
+   - **Configuration**: 300 estimators, max depth 6, learning rate 0.05, subsample 0.85, colsample 0.85.
+   - **Performance**: 5-fold CV $R^2 = 0.9949$, $\text{MAPE} = 1.22\%$.
+   - **Strengths**: Regularized gradient boosted tree modeling with fine-grained subsampling.
+4. **Domain-Weighted K-Nearest Neighbors (`ArchitectureWeightedKNN`)**
+   - **Configuration**: $k=5$ neighbors, distance-weighted Euclidean interpolation with microarchitectural bottleneck weighting (`issue_width` $\times 3.5$, `fetch_width` $\times 2.0$, `l2_size_kb` $\times 2.5$, `clk_freq_ghz` $\times 2.0$, workload identity $\times 4.0$).
+   - **Performance**: 5-fold CV $R^2 = 0.9179$, $\text{MAPE} = 6.33\%$ (remedying standard KNN's high-dimensional distance collapse of $0.27$).
 
 ### Feature Preprocessing Pipeline
 All models use a scikit-learn `ColumnTransformer`:

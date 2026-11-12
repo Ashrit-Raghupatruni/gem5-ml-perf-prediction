@@ -126,7 +126,37 @@ python3 ml/validate_and_evaluate.py \
 
 ---
 
-## 💾 5. Copy ML Artifacts to Windows
+
+---
+
+## 🔮 5. Custom Input Inference (Single Design or Batch CSV) (`ml/predict_custom.py`)
+
+Feed arbitrary user-defined microarchitectural parameters into the trained champion model without running gem5:
+- **Automatic feature engineering**: Calculates all 9 microarchitectural ratios automatically.
+- **Physical constraint checks**: Monotonicity validation ($	ext{issue} \le 	ext{decode} \le 	ext{fetch}$).
+- **Output metrics**: Predicted IPC, epistemic uncertainty ($\sigma$), 95% CI $[\mu - 1.96\sigma, \mu + 1.96\sigma]$, Upper Confidence Bound (UCB), Area cost, Dynamic Power proxy, and Energy per instruction proxy.
+
+### A. Single Configuration Prediction:
+```bash
+python3 ml/predict_custom.py \
+  --workload matmul \
+  --fetch-width 8 \
+  --issue-width 8 \
+  --rob 256 \
+  --l1d-size 64 \
+  --l2-size 2048 \
+  --clk-freq 3.0
+```
+
+### B. Batch CSV / JSON Prediction:
+```bash
+python3 ml/predict_custom.py \
+  --csv examples/custom_inputs_template.csv \
+  --output-csv outputs/custom_predictions.csv \
+  --output-json outputs/custom_predictions.json
+```
+
+## 💾 6. Copy ML Artifacts to Windows
 
 To view all trained models, metadata, and visualization figures in Windows File Explorer:
 

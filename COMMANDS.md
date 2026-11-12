@@ -203,6 +203,33 @@ Outputs created:
 
 ---
 
+
+---
+
+### Step 9: Custom Input Prediction (Single Design or Batch CSV)
+
+Predict cycle-accurate IPC, uncertainty ($\sigma$), 95% confidence intervals, and hardware cost proxies for any custom processor configuration or batch CSV dataset:
+
+#### Option A: Predict Single Configuration via CLI Flags
+```bash
+python3 ml/predict_custom.py \
+  --workload matmul \
+  --fetch-width 8 \
+  --issue-width 8 \
+  --rob 256 \
+  --l1d-size 64 \
+  --l2-size 2048 \
+  --clk-freq 3.0
+```
+
+#### Option B: Predict Batch Configurations from CSV
+```bash
+python3 ml/predict_custom.py \
+  --csv examples/custom_inputs_template.csv \
+  --output-csv outputs/custom_predictions.csv \
+  --output-json outputs/custom_predictions.json
+```
+
 ## 🧹 Maintenance Commands
 
 ### Copy Generated Visualizations & Datasets to Windows File Explorer:

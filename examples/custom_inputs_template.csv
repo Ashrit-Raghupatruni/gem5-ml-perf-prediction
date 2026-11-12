@@ -1,0 +1,10 @@
+workload,fetch_width,decode_width,issue_width,commit_width,rob_entries,iq_entries,lq_entries,sq_entries,phys_int_regs,phys_fp_regs,branch_predictor,l1d_size_kb,l1d_assoc,l1i_size_kb,l1i_assoc,l2_size_kb,l2_assoc,clk_freq_ghz
+matmul,8,8,8,8,256,64,32,32,192,192,TournamentBP,64,4,64,4,2048,16,3.0
+matmul,4,4,4,4,128,48,24,24,144,144,BiModeBP,32,2,32,2,1024,8,2.4
+matmul,2,2,2,2,64,32,16,16,128,128,LocalBP,16,2,16,2,256,4,1.5
+stream,8,8,8,8,256,64,32,32,192,192,TournamentBP,128,8,64,4,2048,16,3.0
+stream,4,4,4,4,96,48,24,24,144,144,BiModeBP,64,4,32,2,1024,8,2.0
+quicksort,8,8,8,8,192,64,32,32,192,192,TournamentBP,64,4,32,2,1024,8,2.4
+quicksort,4,4,4,4,128,48,24,24,144,144,BiModeBP,32,2,32,2,512,4,2.0
+hash,8,8,8,8,192,64,32,32,192,192,BiModeBP,32,4,32,4,1024,8,2.4
+hash,2,2,2,2,64,32,16,16,128,128,LocalBP,16,2,16,2,256,4,1.5
