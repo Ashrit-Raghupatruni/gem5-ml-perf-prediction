@@ -99,7 +99,7 @@ python3 scripts/parse_dataset.py \
 
 Outputs created:
 - Unified dataset: `dataset/dataset_cleaned.csv` and integrity checksum `dataset/dataset_cleaned.csv.sha256`
-- Separated input features: `dataset/dataset_features.csv` and `outputs/features.csv` (19 features + `config_id`)
+- Separated input features: `dataset/dataset_features.csv` and `outputs/features.csv` (19 microarchitectural parameters + `config_id`)
 - Separated target outputs: `dataset/dataset_outputs.csv` and `outputs/outputs.csv` (15 execution metrics + `config_id`)
 - Summary quality reports: `dataset/dataset_quality_report.json` and `outputs/dataset_quality_report.json`
 

@@ -3,7 +3,7 @@
 [![Target Architecture](https://img.shields.io/badge/Architecture-ARM%20AArch64-blue.svg)](https://www.arm.com/)
 [![Simulator](https://img.shields.io/badge/Simulator-gem5%20v24%2B-orange.svg)](https://www.gem5.org/)
 [![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
-[![CI Status](https://img.shields.io/badge/CI-Passing-brightgreen.svg)](https://github.com/Ashrit-Raghupatruni/gem5-ml-perf-prediction/actions)
+[![Pipeline Verification & ML CI](https://github.com/Ashrit-Raghupatruni/gem5-ml-perf-prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/Ashrit-Raghupatruni/gem5-ml-perf-prediction/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 An end-to-end research and engineering framework that bridges cycle-accurate architectural simulation (**gem5**) and machine learning surrogate modeling. It screens thousands of Out-of-Order ARM processor microarchitectural configurations in milliseconds while maintaining high fidelity to true cycle-accurate simulation.
@@ -32,7 +32,7 @@ Cycle-accurate microarchitectural simulation using **gem5** is the gold standard
 
 ### What It Does
 This project establishes an automated, decoupled ML surrogate modeling pipeline for **ARM (AArch64)** processors:
-- **Design of Experiments (DoE)**: Samples 17 decoupled architectural dimensions using Latin Hypercube Sampling (LHS).
+- **Design of Experiments (DoE)**: Explores an 18-parameter microarchitectural space (17 independently decoupled numerical dimensions + categorical branch predictor selection) across 4 workloads using Latin Hypercube Sampling (LHS).
 - **Parallel gem5 Automation**: Executes cycle-accurate simulations across multi-core systems with manifest-driven environment provenance and execution accounting.
 - **Dataset Generation**: Harvests cycle-accurate statistics into unified and decoupled CSV datasets (`outputs/features.csv` and `outputs/outputs.csv`).
 - **Surrogate Modeling**: Evaluates regression algorithms (HistGradientBoosting, Random Forest, KNN) to predict Instructions Per Cycle (IPC).
@@ -119,10 +119,16 @@ gem5-ml-perf-prediction/
 │   README.md                           # Master Project Documentation & Quickstart
 │   COMMANDS.md                         # Complete Sequential Command Reference
 │   ML_COMMANDS.md                      # Isolated ML & Optimization Command Reference
-│   requirements.txt                    # Project Python Dependencies
+│   requirements.txt                    # Project Python Dependencies (FastAPI, scikit-learn, XGBoost, etc.)
+│   run_ui.py                           # Single-command launcher for interactive Web Dashboard & REST API
 │   LICENSE                             # MIT License
 │   .github/workflows/ci.yml            # Automated CI Workflow
 │   
+├── backend/                            # FastAPI REST Service & Prediction Handlers
+│       app.py                          # Application entry point, CORS, routes & static mounts
+│       schemas.py                      # Pydantic data schemas & parameter bounds
+│       services.py                     # ML pipeline loading, inference & ratio extraction
+│       
 ├── benchmarks/                         # ARM AArch64 Benchmark Suite
 │       hash.c                          # Integer ALU / shift / ILP bound
 │       Makefile                        # Cross-compilation (aarch64-linux-gnu-gcc -O2 -static)
@@ -131,49 +137,73 @@ gem5-ml-perf-prediction/
 │       stream.c                        # Memory bandwidth & DRAM streaming bound
 │       
 ├── configs/                            # gem5 Architecture Configuration Engine
+│       active_queries.json             # 15 high-uncertainty configurations from active learning
 │       arm_o3_parametric.py            # Parametric ARM O3CPU + 2-Level Cache + Memory model
 │       sweep_configs.json              # Master LHS configuration points
 │       
-├── dataset/                            # Dataset Storage
-│       dataset_cleaned.csv             # Combined 34-column dataset
-│       dataset_features.csv            # 19 decoupled microarchitectural features
-│       dataset_outputs.csv             # 15 simulation targets & counters
+├── dataset/                            # Dataset Storage (5,000 Validated Samples)
+│       dataset_cleaned.csv             # Combined 34-column dataset (20 inputs + 14 metrics)
+│       dataset_features.csv            # 20 input feature columns (config_id + 19 architectural knobs)
+│       dataset_outputs.csv             # 16 simulation target columns (config_id, workload + 14 metrics)
 │       dataset_cleaned.csv.sha256      # SHA-256 integrity checksum
 │       dataset_quality_report.json     # Data harvesting quality & validation audit
 │       top5_candidates.json            # Top Pareto-optimal candidate microarchitectures
+│       validation_results.csv          # Ground-truth gem5 validation for Top-5 designs
+│       validation_summary.json         # Summary report (2.25% MAPE, timing accounting)
+│       
+├── examples/                           # Custom Input Templates
+│       custom_inputs_template.csv      # Sample batch CSV template across all 4 workloads
+│       
+├── frontend/                           # Interactive Web Dashboard (View-Only Mode)
+│       index.html                      # Dark-mode dashboard (Tailwind CSS, Chart.js, Lucide)
+│       custom_inputs_template.csv      # Static sample file for in-browser inspection
 │       
 ├── ml/                                 # Machine Learning & Surrogate Engine
-│       train_models.py                 # Model training, stratified CV, and feature importance
-│       predict_and_screen.py           # 5,000-candidate screener & Pareto optimizer (UCB + proxies)
-│       validate_and_evaluate.py        # Ground-truth gem5 validation & speedup engine
 │       active_learning.py              # Uncertainty-guided active learning query selector
 │       benchmark_active_learning.py    # Multi-seed sample efficiency benchmarking engine
-│       saved_models/                   # Exported model pipelines & metadata
+│       predict_and_screen.py           # 5,000-candidate screener & Pareto optimizer (UCB + proxies)
+│       predict_custom.py               # Standalone custom prediction CLI (single or batch CSV)
+│       train_models.py                 # 4-model training, 5-fold CV, and feature importance
+│       validate_and_evaluate.py        # Ground-truth gem5 validation & 3-tier benchmark engine
+│       saved_models/                   # Exported model pipelines (best_model_ipc.joblib) & metadata
 │       
 ├── outputs/                            # Simulation Outputs & Harvested Reports
-│       features.csv                    # 2,000 rows of input features
-│       outputs.csv                     # 2,000 rows of simulation outputs
+│       custom_predictions.csv          # Sample batch prediction output
+│       custom_predictions.json         # Sample batch prediction JSON with UCB and proxies
+│       features.csv                    # Harvested features copy
+│       outputs.csv                     # Harvested simulation outputs copy
 │       dataset_quality_report.json     # Quality and provenance report
 │       validation_results.csv          # Ground-truth validation measurements
 │       validation_summary.json         # Complete timing and accuracy audit
 │       simulation_manifest.json        # Simulation run telemetry
 │       
-├── tests/                              # Automated Test Suite
-│       test_pipeline.py                # Unit & regression tests for LHS, parser, and ML pipeline
+├── scripts/                            # Automation & Simulation Scripts
+│       generate_design_space.py        # Latin Hypercube Sampling with decoupled dimensions
+│       parse_dataset.py                # Stats harvesting, decoupling, and validation
+│       run_parallel_sweep.py           # Multi-worker parallel gem5 runner with watchdog
+│       
+├── tests/                              # Automated Test Suite (22 Unit & Regression Tests)
+│       test_backend_api.py             # FastAPI endpoints, preview, and prediction tests
+│       test_custom_predict.py          # predict_custom.py CLI and default fill tests
+│       test_pipeline.py                # LHS bounds, parser, and ML pipeline regression tests
 │       
 └── visualizations/                     # High-Resolution Publication Plots
+        feature_importance.png          # Permutation feature importance ranking
+        pareto_frontier.png             # Multi-objective IPC vs. area cost frontier
+        predicted_vs_actual.png         # Held-out test calibration (R² = 0.9965)
+        speedup_comparison.png          # Defensible execution speedup accounting
 ```
 
 ---
 
 ## 📊 Dataset & Features Specification
 
-The dataset captures 19 microarchitectural input features and 15 cycle-accurate output metrics.
+The dataset captures **20 input feature columns** (`config_id` + workload + 18 architectural dimensions = 19 parameters) and **16 simulation output columns** (`config_id` + `workload` + 14 performance metrics and counters), unified in `dataset/dataset_cleaned.csv` (34 total columns).
 
 ### 1. Input Features (`outputs/features.csv`)
 | Feature | Type | Range / Options | Description |
 | :--- | :--- | :--- | :--- |
-| `config_id` | Identifier | `CFG_0000` - `CFG_1999` | Unique configuration design point |
+| `config_id` | Identifier | `CFG_000` - `CFG_4999` | Unique configuration design point |
 | `workload` | Categorical | `matmul`, `stream`, `quicksort`, `hash` | Executed benchmark workload |
 | `fetch_width` | Numerical | `2, 4, 8` | Instruction fetch pipeline width |
 | `decode_width` | Numerical | `2, 4, 8` | Instruction decode pipeline width |
@@ -364,35 +394,32 @@ python3 ml/predict_custom.py \
   --csv examples/custom_inputs_template.csv \
   --output-csv outputs/custom_predictions.csv \
   --output-json outputs/custom_predictions.json
-`
+```
 
 ---
 
 ### Step 9: Interactive Research Platform & Web UI
 
-Launch the comprehensive microarchitectural research platform (matching our 5-panel layout with view-only dataset exploration, Top-5 validation vs cycle-level ground truth, 4-model benchmarking, 4 core publication plots, active learning queries with epistemic uncertainty, and custom parameter inference):
+Launch the interactive multi-page microarchitectural research platform (featuring view-only dataset inspection, Top-5 validation vs. cycle-level ground truth, 4-model benchmarking, 4 publication plots with zoom lightbox, active learning uncertainty queries, and live parameter sliders):
 
-\\ash
+```bash
 python3 run_ui.py --host 127.0.0.1 --port 8000
-\
-- **Dashboard Overview**: Direct view of Dataset metrics (20 inputs, 16 outputs), Top-5 Pareto ground-truth validation vs. gem5 simulation, 4-model comparison suite, and 15 uncertainty-based Active Learning queries.
-- **Dataset Explorer**: In-browser search & inspect for 5,000 samples (View-Only mode without download button).
-- **Visualizations Gallery**: Interactive zoom lightbox for all 4 core evaluation figures (Feature Importance, Pareto Frontier, Predicted vs Actual, and Speedup Comparison).
-- **Active Learning Suite**: High-uncertainty candidate configurations identified for adaptive gem5 screening.
-- **Custom Predictor**: Real-time interactive sliders and radar chart for on-the-fly microarchitectural performance evaluation.
+```
 
-\\ash
-python3 run_ui.py --host 127.0.0.1 --port 8000
-\
-Access the modern dark-mode interface at \http://localhost:8000\. Explore single-configuration predictions via interactive sliders and segmented selectors, or drag-and-drop batch CSV datasets with automatic Pareto frontier identification and export capabilities.
-``
-
+- **URL**: `http://127.0.0.1:8000` (or `http://localhost:8000`)
+- **Interactive OpenAPI/Swagger Docs**: `http://127.0.0.1:8000/docs`
+- **Pages Included**:
+  1. **Dashboard Overview**: 5-panel layout with Dataset status, Top-5 validation comparison table, 4-model performance metrics, 4 plot cards, and active learning queries.
+  2. **Dataset Explorer**: In-browser search & tabular inspect across all 5,000 verified simulation samples (View-Only mode, toggles between 20 input features and 16 output targets).
+  3. **Visualizations Gallery**: Interactive lightbox view for all 4 publication plots (Feature Importance, Pareto Frontier, Predicted vs Actual, and Speedup Comparison).
+  4. **Active Learning Suite**: 15 high-uncertainty query designs with epistemic variance ($\sigma$) bounds.
+  5. **Custom Predictor**: Live parameter sliders, radar balance charts, and real-time millisecond inference.
 
 ---
 
 ## 🤖 Machine Learning Models
 
-The framework evaluates three distinct regression algorithms to balance accuracy, training time, and uncertainty quantification:
+The framework evaluates **four distinct regression algorithms** to balance predictive accuracy, training overhead, and epistemic uncertainty quantification (with all dependencies including `xgboost>=2.0.0` specified in `requirements.txt`):
 
 1. **Histogram-Based Gradient Boosting (`HistGradientBoostingRegressor`) — Champion Model**
    - **Configuration**: 300 iterations, learning rate 0.06, minimum 8 samples per leaf.

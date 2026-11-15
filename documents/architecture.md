@@ -13,7 +13,7 @@ The architecture is structured as a decoupled 5-tier pipeline: Workload Tier, ge
                                                                |
                                                                v
  [Simulation Tier]
-  scripts/generate_design_space.py  --(Latin Hypercube Sampling)--> configs_sweep.json (160 points)
+  scripts/generate_design_space.py  --(Latin Hypercube Sampling)--> configs_sweep.json (5,000 points)
                                                                |
                                                                v
   scripts/run_parallel_sweep.py <===> configs/arm_o3_parametric.py (gem5.opt ARM)

@@ -322,7 +322,7 @@ Three distinct model families are implemented in `ml/train_models.py` and evalua
 | :--- | :--- | :--- | :--- | :--- |
 | **RandomForest** *(Champion)* | `RandomForestRegressor(n_estimators=200, max_depth=12, random_state=42, n_jobs=-1)` | Bootstrap ensemble of decision trees with feature sub-sampling at each split. | **Pros**: Non-linear interactions, robust to outliers, yields tree-disagreement uncertainty.<br/>**Cons**: Cannot extrapolate beyond min/max observed IPC. | **Selected Champion Model** (Saved in `ml/saved_models/`) |
 | **HistGradientBoosting** | `HistGradientBoostingRegressor(max_iter=250, learning_rate=0.08, min_samples_leaf=5, random_state=42)` | Bin-based gradient boosted regression trees optimizing squared error. | **Pros**: Highly competitive accuracy, fast inference.<br/>**Cons**: Does not inherently provide ensemble variance across sub-estimators. | Evaluated Candidate |
-| **KNN** | `KNeighborsRegressor(n_neighbors=5, weights='distance')` | Non-parametric instance-based regression weighted by inverse Euclidean distance. | **Pros**: Simple, fast training.<br/>**Cons**: Suffers from the curse of dimensionality across 19 features; poor performance ($R^2 \approx 0.13$). | Baseline Model |
+| **KNN** | `KNeighborsRegressor(n_neighbors=5, weights='distance')` | Non-parametric instance-based regression weighted by inverse Euclidean distance. | **Pros**: Simple, fast training.<br/>**Cons**: Suffers from the curse of dimensionality across 19 microarchitectural parameters; poor performance ($R^2 \approx 0.13$). | Baseline Model |
 
 ---
 

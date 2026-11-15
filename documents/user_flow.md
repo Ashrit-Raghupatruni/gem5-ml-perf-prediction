@@ -27,7 +27,7 @@
             v
   [Phase 3: Design-of-Experiments (DoE) Sampling]
   $ python3 scripts/generate_design_space.py --num-samples 160 --output configs/sweep_configs.json
-  Outputs: 160 balanced Latin Hypercube sampled configuration points across 4 benchmarks
+  Outputs: 5,000 balanced Latin Hypercube sampled configuration points across 4 benchmarks
             |
             v
   [Phase 4: Parallel Simulation Sweep]
@@ -37,7 +37,7 @@
             v
   [Phase 5: Data Harvesting & Validation]
   $ python3 scripts/parse_dataset.py --input-dir outputs/ --output dataset/dataset_cleaned.csv
-  Outputs: Clean tabular CSV with 18 input features and 7 target metrics (IPC, MPKI, DRAM, etc.)
+  Outputs: Clean tabular CSV with 20 input features and 16 target metrics (IPC, MPKI, DRAM, etc.)
             |
             v
   [Phase 6: Machine Learning Training & Evaluation]
