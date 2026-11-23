@@ -23,6 +23,14 @@ class SingleHardwareConfig(BaseModel):
     l2_assoc: int = Field(default=4, ge=1, le=64, description="L2 Cache associativity")
     clk_freq_ghz: float = Field(default=2.4, ge=1.0, le=5.0, description="Clock frequency in GHz")
 
+class DesignEvaluation(BaseModel):
+    status: str = Field(description="Optimal, Good, Sub-optimal, or Inefficient")
+    score: int = Field(description="Quality score from 0 to 100")
+    efficiency_ratio: float = Field(description="IPC per area unit * 10")
+    is_pareto_dominated: bool = Field(description="Whether a cheaper design achieves strictly higher IPC")
+    diagnosis: str = Field(description="Physical microarchitectural bottleneck diagnosis")
+    recommendation: str = Field(description="Hardware tuning recommendation")
+
 class SinglePredictionResponse(BaseModel):
     ipc: float
     uncertainty_sigma: float
@@ -35,6 +43,7 @@ class SinglePredictionResponse(BaseModel):
     latency_ms: float
     ratios: Dict[str, float]
     filled_config: Dict[str, Any]
+    evaluation: Optional[DesignEvaluation] = None
 
 class BatchPredictionResponse(BaseModel):
     total_samples: int
