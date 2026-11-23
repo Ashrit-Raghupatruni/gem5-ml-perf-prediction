@@ -21,7 +21,7 @@ The architecture is structured as a decoupled 5-tier pipeline: Workload Tier, ge
        +---> outputs/run_001/stats.txt
        +---> outputs/run_002/stats.txt
        +---> ...
-       +---> outputs/run_160/stats.txt
+       +---> outputs/run_CFG_*/stats.txt
                                                                |
                                                                v
  [Data Tier]

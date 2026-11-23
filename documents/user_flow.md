@@ -26,7 +26,7 @@
             |
             v
   [Phase 3: Design-of-Experiments (DoE) Sampling]
-  $ python3 scripts/generate_design_space.py --num-samples 160 --output configs/sweep_configs.json
+  $ python3 scripts/generate_design_space.py --samples 5000 --output configs/sweep_configs.json
   Outputs: 5,000 balanced Latin Hypercube sampled configuration points across 4 benchmarks
             |
             v
@@ -74,7 +74,7 @@ make -C benchmarks
 ### Step 2: Sampling Space Generation
 ```bash
 python3 scripts/generate_design_space.py \
-  --num-samples 160 \
+  --samples 5000 \
   --output configs/sweep_configs.json \
   --seed 42
 ```
@@ -91,11 +91,11 @@ python3 scripts/run_parallel_sweep.py \
 ```
 - Visual feedback:
   ```
-  [1/160] (matmul) Width=4, ROB=128, L1D=64K, Freq=2.4GHz -> [COMPLETED] (Time: 8.4s)
-  [2/160] (stream) Width=2, ROB=64,  L1D=16K, Freq=1.5GHz -> [COMPLETED] (Time: 11.2s)
+  [1/5000] (matmul) Width=4, ROB=128, L1D=64K, Freq=2.4GHz -> [COMPLETED] (Time: 8.4s)
+  [2/5000] (stream) Width=2, ROB=64,  L1D=16K, Freq=1.5GHz -> [COMPLETED] (Time: 11.2s)
   ...
-  Progress: [========================================] 100% (160/160 Finished)
-  Total Elapsed Time: 18m 42s | Success: 160 | Failures: 0
+  Progress: [========================================] 100% (5000/5000 Finished)
+  Total Elapsed Time: 18m 42s | Success: 5000 | Failures: 0
   ```
 
 ### Step 4: Dataset Parsing & Cleaning

@@ -32,7 +32,8 @@ Cycle-accurate microarchitectural simulation using **gem5** is the gold standard
 
 ### What It Does
 This project establishes an automated, decoupled ML surrogate modeling pipeline for **ARM (AArch64)** processors:
-- **Design of Experiments (DoE)**: Explores an 18-parameter microarchitectural space (17 independently decoupled numerical dimensions + categorical branch predictor selection) across 4 workloads using Latin Hypercube Sampling (LHS).
+- **Benchmark Suite**: Employs 4 distinct workloads (`matmul`, `stream`, `quicksort`, `hash`) to stress different microarchitectural subsystems (compute throughput, memory bandwidth/DRAM stalls, branch prediction/control-flow, and integer ALU/irregular indexing), preventing surrogate overfitting.
+- **Design of Experiments (DoE)**: Explores an 18-parameter microarchitectural space (17 independently decoupled numerical dimensions + categorical branch predictor selection) across the 4 workloads using Latin Hypercube Sampling (LHS).
 - **Parallel gem5 Automation**: Executes cycle-accurate simulations across multi-core systems with manifest-driven environment provenance and execution accounting.
 - **Dataset Generation**: Harvests cycle-accurate statistics into unified and decoupled CSV datasets (`outputs/features.csv` and `outputs/outputs.csv`).
 - **Surrogate Modeling**: Evaluates regression algorithms (HistGradientBoosting, Random Forest, KNN) to predict Instructions Per Cycle (IPC).
@@ -48,8 +49,8 @@ This project establishes an automated, decoupled ML surrogate modeling pipeline 
 
 ## 🏆 Experimental Results & Verification
 
-All reported metrics are measured on the 2,000-sample production run:
-- **Dataset Size**: 2,000 completed cycle-accurate gem5 simulations (500 samples each across `matmul`, `stream`, `quicksort`, `hash`).
+All reported metrics are measured on the 5,000-sample production run:
+- **Dataset Size**: 5,000 completed cycle-accurate gem5 simulations (1,250 samples each across `matmul`, `stream`, `quicksort`, `hash`).
 - **Dataset SHA-256**: `a464e15b0a48cc41d07074a2637f3f944b80ec1f8764a970c594e33d1f0245d9` (recorded in `dataset/dataset_cleaned.csv.sha256`).
 - **Champion Model**: Histogram-Based Gradient Boosting (`HistGradientBoostingRegressor`) selected via 5-fold cross-validation on the 80% training split (1,600 samples) and evaluated on an untouched 20% test split (400 samples).
 
@@ -328,8 +329,8 @@ python3 scripts/parse_dataset.py \
   --output dataset/dataset_cleaned.csv
 ```
 *Outputs Generated:*
-- `outputs/features.csv` and `dataset/dataset_features.csv` (all 2,000 feature rows)
-- `outputs/outputs.csv` and `dataset/dataset_outputs.csv` (all 2,000 target rows)
+- `outputs/features.csv` and `dataset/dataset_features.csv` (all 5,000 feature rows)
+- `outputs/outputs.csv` and `dataset/dataset_outputs.csv` (all 5,000 target rows)
 - `outputs/dataset_quality_report.json` (audit report)
 - `dataset/dataset_cleaned.csv.sha256` (integrity checksum)
 
@@ -457,10 +458,10 @@ All models use a scikit-learn `ColumnTransformer`:
 - **Cause**: AArch64 cross-compiler is not installed on the host system.
 - **Fix**: Install the toolchain via `sudo apt install gcc-aarch64-linux-gnu`.
 
-### 3. "Why does the dataset show 500 samples per workload when I requested 2,000?"
+### 3. "How does the dataset distribute samples across workloads?"
 - **Explanation**: The design space generator distributes total samples evenly across the 4 benchmarks:
-  $$\frac{2000 \text{ total samples}}{4 \text{ workloads}} = 500 \text{ samples per workload}$$
-  Both `outputs/features.csv` and `outputs/outputs.csv` contain the complete **2,000 rows**.
+  $$\frac{5000 \text{ total samples}}{4 \text{ workloads}} = 1250 \text{ samples per workload}$$
+  Both `outputs/features.csv` and `outputs/outputs.csv` contain the complete **5,000 rows** (or 500 per workload if running a 2,000-sample exploration).
 
 ### 4. gem5 Simulation Timeouts
 - **Cause**: Complex microarchitectural configurations (e.g., small caches with wide issue widths) simulating memory-intensive workloads may run slowly.

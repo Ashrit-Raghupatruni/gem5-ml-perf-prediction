@@ -11,7 +11,7 @@ This document specifies the exact schemas, column definitions, data types, norma
 
 | Column Name | Data Type | Units / Scale | Legal Values / Range | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| `config_id` | `string` | ID | `CFG_001` .. `CFG_160` | Unique configuration identifier |
+| `config_id` | `string` | ID | `CFG_001` .. `CFG_4999` | Unique configuration identifier |
 | `workload` | `string` | Categorical | `matmul`, `stream`, `quicksort`, `hash` | Target benchmark workload |
 | `fetch_width` | `integer` | Insts/cycle | `2, 4, 8` | Pipeline fetch stage width |
 | `decode_width` | `integer` | Insts/cycle | `2, 4, 8` | Instruction decode width |

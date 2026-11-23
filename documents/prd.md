@@ -87,7 +87,7 @@ Extracted directly from `stats.txt`:
 ---
 
 ## 6. Functional Requirements
-1. **Automated Latin Hypercube Sampling (LHS)**: Sample $N=160$ design points avoiding clustering and ensuring uniform coverage of parameter dimensions.
+1. **Automated Latin Hypercube Sampling (LHS)**: Sample $N=5000$ design points avoiding clustering and ensuring uniform coverage of parameter dimensions.
 2. **Parallel Sweep Harness**: Parallelize gem5 runs across multi-core host CPU using Python's `multiprocessing` with per-run log isolation.
 3. **Stat Harvester**: Robust parser extracting metrics with fallback sanity checks and regex validation.
 4. **Multi-Model ML Pipeline**: Train and compare Ridge Regression, Random Forest, and Gradient Boosted Trees (XGBoost/LightGBM/HistGradientBoosting).
