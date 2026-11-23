@@ -285,6 +285,13 @@ Verify that all unit tests, configuration validation bounds, and pipeline compon
 python3 -m unittest discover tests -v
 ```
 
+### 5. Launch the Interactive Web Dashboard & REST API
+Launch the local web server to interactively explore the dataset, models, visualizations, and live custom predictions:
+```bash
+python3 run_ui.py --host 127.0.0.1 --port 8000
+```
+Open **http://127.0.0.1:8000** in your browser (OpenAPI Swagger docs at **http://127.0.0.1:8000/docs**).
+
 ---
 
 ## 🚀 Usage Examples & End-to-End Execution
