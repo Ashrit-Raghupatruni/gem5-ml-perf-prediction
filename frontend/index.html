@@ -559,6 +559,53 @@
           <button onclick="runSinglePrediction()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-medium text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30">
             <i data-lucide="zap" class="w-4 h-4"></i> Predict Performance & Uncertainty
           </button>
+
+          <!-- SEPARATE DEDICATED PARETO DESIGN QUALITY & ISSUE DIAGNOSIS CARD UNDER BUTTON -->
+          <div id="p-eval-container" class="mt-4 glass-card rounded-2xl p-4 border border-emerald-500/30 bg-emerald-950/20 shadow-lg transition-all duration-300">
+            <div class="flex items-center justify-between pb-2 border-b border-gray-800">
+              <div class="flex items-center gap-2">
+                <div id="p-eval-icon" class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                  <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h4 id="p-eval-title" class="text-xs font-bold text-gray-100 flex items-center gap-1.5">
+                    Pareto Design Evaluation: <span class="text-emerald-400">Optimal (Score: 88/100)</span>
+                  </h4>
+                  <span class="text-[10px] text-gray-400">Benchmarked against validated gem5 Pareto envelope</span>
+                </div>
+              </div>
+              <span id="p-eval-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                Optimal
+              </span>
+            </div>
+
+            <!-- Current Design Status vs Issues & Recommendations -->
+            <div class="space-y-2 mt-3">
+              <div class="bg-dark-750/70 p-2.5 rounded-xl border border-gray-800">
+                <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                  <i data-lucide="microchip" class="w-3.5 h-3.5 text-indigo-400"></i> Current Design Status
+                </div>
+                <p id="p-eval-current-status" class="text-[11px] text-gray-200 leading-relaxed font-mono">
+                  Workload: matmul | Width: 4/4 | ROB: 128 | L1D: 64K | L2: 1024K | Freq: 2.4 GHz
+                </p>
+                <p id="p-eval-diag" class="text-[11px] text-gray-300 mt-1 leading-snug">
+                  Near Pareto-optimal frontier! High throughput achieved with strong silicon area utilization.
+                </p>
+              </div>
+
+              <div class="bg-dark-750/70 p-2.5 rounded-xl border border-gray-800">
+                <div class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                  <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-amber-400"></i> Identified Issues & Bottlenecks
+                </div>
+                <p id="p-eval-issue-text" class="text-[11px] text-amber-300/90 leading-snug">
+                  No structural pipeline stalls detected. Operating near ideal IPC capacity.
+                </p>
+                <p id="p-eval-rec" class="text-[11px] text-indigo-400 font-medium mt-1">
+                  Recommendation: Balanced configuration ready for gem5 cycle-accurate sign-off.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Output Column -->
@@ -591,52 +638,7 @@
             </div>
           </div>
 
-          <!-- 2. SEPARATE PROMINENT DESIGN QUALITY EVALUATION BANNER -->
-          <div id="p-eval-container" class="glass-card rounded-2xl p-4 border border-emerald-500/30 bg-emerald-950/20 shadow-lg transition-all duration-300">
-            <div class="flex items-center justify-between pb-2 border-b border-gray-800">
-              <div class="flex items-center gap-2">
-                <div id="p-eval-icon" class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                  <i data-lucide="check-circle-2" class="w-4 h-4"></i>
-                </div>
-                <div>
-                  <h4 id="p-eval-title" class="text-sm font-bold text-gray-100 flex items-center gap-2">
-                    Pareto Design Evaluation: <span class="text-emerald-400">Optimal (Score: 88/100)</span>
-                  </h4>
-                  <span class="text-[11px] text-gray-400">Real-time trade-off analysis compared with validated gem5 Pareto envelope</span>
-                </div>
-              </div>
-              <span id="p-eval-badge" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                Optimal
-              </span>
-            </div>
-
-            <!-- Side-by-side Issue & Current Design Comparison -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 pt-1">
-              <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
-                <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-1">
-                  <i data-lucide="microchip" class="w-3.5 h-3.5 text-indigo-400"></i> Current Design Status
-                </div>
-                <p id="p-eval-current-status" class="text-xs text-gray-200 leading-relaxed font-mono">
-                  Width: 4/4 | ROB: 128 | L1D: 64K | L2: 1024K | Freq: 2.4 GHz
-                </p>
-                <p id="p-eval-diag" class="text-xs text-gray-300 mt-1.5 leading-snug">
-                  Near Pareto-optimal frontier! High throughput achieved with strong silicon area utilization.
-                </p>
-              </div>
-
-              <div class="bg-dark-750/70 p-3 rounded-xl border border-gray-800">
-                <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-1">
-                  <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-amber-400"></i> Issues & Optimization Tips
-                </div>
-                <p id="p-eval-issue-text" class="text-xs text-amber-300/90 leading-snug">
-                  No structural pipeline stalls detected. Operating near ideal IPC capacity.
-                </p>
-                <p id="p-eval-rec" class="text-xs text-indigo-400 font-medium mt-1.5">
-                  Recommendation: Balanced configuration ready for gem5 cycle-accurate sign-off.
-                </p>
-              </div>
-            </div>
-          </div>
+          
 
           <!-- 3. Radar & Scatter Visualizations -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
@@ -1058,6 +1060,10 @@
     // Auto-init on load
     window.onload = () => {
       initOverview();
+      // Ensure custom prediction evaluator is pre-initialized on load
+      if (typeof runSinglePrediction === 'function') {
+        runSinglePrediction();
+      }
     };
   </script>
 </body>
